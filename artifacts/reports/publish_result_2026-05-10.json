@@ -1,0 +1,106 @@
+{
+  "date": "2026-05-10",
+  "target_repo": "caojiajun777/ai-daily-agent",
+  "title": "AI 日报 2026-05-10",
+  "labels": [
+    "ai-daily",
+    "agent-generated"
+  ],
+  "body_preview": "# AI 早报 | 2026年5月10日\n\n> 菲尔兹奖得主证实 ChatGPT 5.5 Pro 可独立完成博士级数学研究，DeepSeek 获 70 亿美元融资创中国 AI 纪录，Claude Mythos 风险评估揭示 16 小时自动化时距，同时 ERNIE 5.1、StepAudio 2.5、Qwen 系列等多款模型与工具集中发布。\n\n## 要闻\n*Top News*\n\n### #1 菲尔兹奖得主称 ChatGPT 5.5 Pro 在无人帮助的两小时内完成“博士级”数学研究\n\n![](https://the-decoder.com/wp-content/uploads/2026/05/ai_and_math.png)\n\n> 来源：The Decoder — [原文链接](https://the-decoder.com/fields-medalist-says-chatgpt-5-5-pro-delivered-phd-level-math-research-in-under-two-hours-with-zero-human-help)\n\n菲尔兹奖得主蒂莫西·高尔斯让 ChatGPT 5.5 Pro 挑战数论中的开放性问题，模型在不到一小时内将一个经典问题的指数界限改进为多项式界限，参与评审的麻省理工学院研究员认为其核心想法“完全具有原创性”。高尔斯总结称，这一结果意味着未来数学贡献的门槛将变为证明某些工作是大语言模型无法完成的。此次实验以零人工干预方式进行，模型仅凭问题描述即自主完成推理与构造，展示了前沿模型在纯数学研究中的涌现能力，可能改变数学界的协作范式与科研流程。\n\n- 模型在1小时内将指数界限改进为多项式界限\n- MIT 研究员评价其核心想法“完全原创”\n- 高尔斯：未来需证明问题为大模型无法完成\n\n---\n\n### #2 DeepSeek 融资 70 亿美元创纪录，创始人个人出资 30 亿\n\n> 来源：rohanpaul — [原文链接](https://x.com/rohanpaul_ai/status/2052901878728659037)\n\nDeepSeek 正以 500 亿美元估值进行高达 70 亿美元的融资，创下中国 AI 领域最大单轮融资纪录。创始人梁文锋个人出资 30 亿美元，占本轮融资的 40%，同时仍保留公司 90% 的所有权。该公司最初诞生于其成功运营的对冲基金内部。本轮资金将主要用于获取大规模计算资源，加速 V4.1 等新模型的发布，并投资企业级产品，目标是推动公司实现营收转正。其发展路径与 OpenAI 和 Anthropic 类似，显示中国头部 AI 公司正从纯研究向商业化快速转型，而创始人的高比例跟投也传递出对技术路线的强烈信心。\n\n- 500 亿美元估值，融资 70 亿美元创中国 AI 纪录\n- 创始人梁文锋个人出资 30 亿仍保留 90% 所有权\n- 资金用于计算资源与 V4.1 模型，推动营收转正\n\n---\n\n### #3 Claude Mythos 评估显示 16 小时自动化风险时距\n\n> 来源：emollick — [原文链接](https://x.com/emollick/status/2052924556264796163)\n\nMETR 于 2026 年 3 月的有限窗口内评估了 Claude Mythos Preview 的早期版本，其任务套件显示该模型的 50% 时间范围至少为 16 小时（95% 置信区间 8.5 小时至 55 小时），这意味着其在被评估的复杂任务中可独立自主操作\n…[truncated]",
+  "body_length": 8551,
+  "gate_result": {
+    "ok": true,
+    "blocked_reasons": []
+  },
+  "duplicates": [
+    {
+      "number": 12,
+      "title": "AI 日报 2026-05-10",
+      "state": "open",
+      "html_url": "https://github.com/caojiajun777/ai-daily-agent/issues/12",
+      "author_login": "caojiajun777"
+    },
+    {
+      "number": 11,
+      "title": "AI 早报 2026-05-10",
+      "state": "closed",
+      "html_url": "https://github.com/caojiajun777/ai-daily-agent/issues/11",
+      "author_login": "caojiajun777"
+    },
+    {
+      "number": 10,
+      "title": "AI 早报 2026-05-10",
+      "state": "closed",
+      "html_url": "https://github.com/caojiajun777/ai-daily-agent/issues/10",
+      "author_login": "caojiajun777"
+    },
+    {
+      "number": 9,
+      "title": "AI 早报 2026-05-10",
+      "state": "closed",
+      "html_url": "https://github.com/caojiajun777/ai-daily-agent/issues/9",
+      "author_login": "caojiajun777"
+    },
+    {
+      "number": 8,
+      "title": "AI 早报 2026-05-10",
+      "state": "closed",
+      "html_url": "https://github.com/caojiajun777/ai-daily-agent/issues/8",
+      "author_login": "caojiajun777"
+    },
+    {
+      "number": 7,
+      "title": "AI 早报 2026-05-10",
+      "state": "closed",
+      "html_url": "https://github.com/caojiajun777/ai-daily-agent/issues/7",
+      "author_login": "caojiajun777"
+    },
+    {
+      "number": 6,
+      "title": "AI 早报 2026-05-10",
+      "state": "closed",
+      "html_url": "https://github.com/caojiajun777/ai-daily-agent/issues/6",
+      "author_login": "caojiajun777"
+    },
+    {
+      "number": 5,
+      "title": "AI 早报 2026-05-10",
+      "state": "closed",
+      "html_url": "https://github.com/caojiajun777/ai-daily-agent/issues/5",
+      "author_login": "caojiajun777"
+    },
+    {
+      "number": 4,
+      "title": "AI 早报 2026-05-10",
+      "state": "closed",
+      "html_url": "https://github.com/caojiajun777/ai-daily-agent/issues/4",
+      "author_login": "caojiajun777"
+    },
+    {
+      "number": 3,
+      "title": "AI 早报 2026-05-10",
+      "state": "closed",
+      "html_url": "https://github.com/caojiajun777/ai-daily-agent/issues/3",
+      "author_login": "caojiajun777"
+    },
+    {
+      "number": 2,
+      "title": "AI 早报 2026-05-10",
+      "state": "closed",
+      "html_url": "https://github.com/caojiajun777/ai-daily-agent/issues/2",
+      "author_login": "caojiajun777"
+    }
+  ],
+  "duplicate_blocked": false,
+  "force": true,
+  "draft_md_path": "artifacts\\drafts\\2026-05-10.md",
+  "draft_json_path": "artifacts\\drafts\\2026-05-10.json",
+  "report_path": "artifacts\\reports\\2026-05-10.json",
+  "ts": 1778469834.1520538,
+  "mode": "confirm",
+  "status": "published",
+  "issue_number": 13,
+  "issue_url": "https://github.com/caojiajun777/ai-daily-agent/issues/13",
+  "issue_created_at": "2026-05-11T03:23:56Z",
+  "forced_over_duplicate": true
+}
