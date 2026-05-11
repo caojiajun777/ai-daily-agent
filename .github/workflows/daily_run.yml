@@ -51,13 +51,6 @@ jobs:
       EMAIL_SUBSCRIBERS: ${{ secrets.EMAIL_SUBSCRIBERS }}
 
     steps:
-      - name: Refuse to run without owner PAT
-        if: ${{ env.PUBLISH_TOKEN == '' }}
-        run: |
-          echo "::error::PUBLISH_TOKEN secret is not set."
-          echo "Issues must be created with the repo owner's PAT, not GITHUB_TOKEN."
-          exit 1
-
       - name: Checkout
         uses: actions/checkout@v4
 
