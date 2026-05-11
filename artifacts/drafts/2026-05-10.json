@@ -1,0 +1,293 @@
+{
+  "date": "2026-05-10",
+  "title": "AI 早报 | 2026年5月10日",
+  "overview": "菲尔兹奖得主证实 ChatGPT 5.5 Pro 可独立完成博士级数学研究，DeepSeek 获 70 亿美元融资创中国 AI 纪录，Claude Mythos 风险评估揭示 16 小时自动化时距，同时 ERNIE 5.1、StepAudio 2.5、Qwen 系列等多款模型与工具集中发布。",
+  "cover_image": "",
+  "sections": [
+    {
+      "heading": "要闻",
+      "items": [
+        {
+          "title": "#1 菲尔兹奖得主称 ChatGPT 5.5 Pro 在无人帮助的两小时内完成“博士级”数学研究",
+          "summary": "菲尔兹奖得主蒂莫西·高尔斯让 ChatGPT 5.5 Pro 挑战数论中的开放性问题，模型在不到一小时内将一个经典问题的指数界限改进为多项式界限，参与评审的麻省理工学院研究员认为其核心想法“完全具有原创性”。高尔斯总结称，这一结果意味着未来数学贡献的门槛将变为证明某些工作是大语言模型无法完成的。此次实验以零人工干预方式进行，模型仅凭问题描述即自主完成推理与构造，展示了前沿模型在纯数学研究中的涌现能力，可能改变数学界的协作范式与科研流程。",
+          "url": "https://the-decoder.com/fields-medalist-says-chatgpt-5-5-pro-delivered-phd-level-math-research-in-under-two-hours-with-zero-human-help",
+          "source": "the_decoder",
+          "image_url": "https://the-decoder.com/wp-content/uploads/2026/05/ai_and_math.png",
+          "highlights": [
+            "模型在1小时内将指数界限改进为多项式界限",
+            "MIT 研究员评价其核心想法“完全原创”",
+            "高尔斯：未来需证明问题为大模型无法完成"
+          ],
+          "related_links": []
+        },
+        {
+          "title": "#2 DeepSeek 融资 70 亿美元创纪录，创始人个人出资 30 亿",
+          "summary": "DeepSeek 正以 500 亿美元估值进行高达 70 亿美元的融资，创下中国 AI 领域最大单轮融资纪录。创始人梁文锋个人出资 30 亿美元，占本轮融资的 40%，同时仍保留公司 90% 的所有权。该公司最初诞生于其成功运营的对冲基金内部。本轮资金将主要用于获取大规模计算资源，加速 V4.1 等新模型的发布，并投资企业级产品，目标是推动公司实现营收转正。其发展路径与 OpenAI 和 Anthropic 类似，显示中国头部 AI 公司正从纯研究向商业化快速转型，而创始人的高比例跟投也传递出对技术路线的强烈信心。",
+          "url": "https://x.com/rohanpaul_ai/status/2052901878728659037",
+          "source": "x_rohanpaul",
+          "image_url": "",
+          "highlights": [
+            "500 亿美元估值，融资 70 亿美元创中国 AI 纪录",
+            "创始人梁文锋个人出资 30 亿仍保留 90% 所有权",
+            "资金用于计算资源与 V4.1 模型，推动营收转正"
+          ],
+          "related_links": []
+        },
+        {
+          "title": "#3 Claude Mythos 评估显示 16 小时自动化风险时距",
+          "summary": "METR 于 2026 年 3 月的有限窗口内评估了 Claude Mythos Preview 的早期版本，其任务套件显示该模型的 50% 时间范围至少为 16 小时（95% 置信区间 8.5 小时至 55 小时），这意味着其在被评估的复杂任务中可独立自主操作超过半天而不需人工干预。METR 指出该时距已达到其无需新任务即可测量的上限，提示前沿模型的自主性正在快速延伸。这一评估为 AI 安全与治理提供了量化风险参照，也为后续的监管尺度与安全对齐研究提出了更紧迫的时间表。",
+          "url": "https://x.com/emollick/status/2052924556264796163",
+          "source": "x_emollick",
+          "image_url": "",
+          "highlights": [
+            "50% 时间范围至少 16 小时，上限达 55 小时",
+            "已达 METR 当前评估工具的上限",
+            "为 AI 安全治理提供量化风险时距基准"
+          ],
+          "related_links": []
+        }
+      ]
+    },
+    {
+      "heading": "模型发布",
+      "items": [
+        {
+          "title": "#4 ERNIE 5.1 发布，预训练成本仅为对标模型 6%",
+          "summary": "百度发布 ERNIE 5.1，基于 ERNIE 5.0 的预训练基础，在搜索、推理、知识问答、创意写作和智能体能力等方面全面升级，而其预训练成本仅为对标模型的约 6%。这一极高性价比意味着大模型训练的门槛正被大幅拉低，可能促使更多企业采用自研路线，同时也对以高训练成本构筑护城河的厂商带来压力。百度未公布具体的参数量与标的对比，但其强调的效率提升或源自飞桨深度学习平台与硬件协同的优化，展现出国产大模型工程化能力的快速成熟。",
+          "url": "https://x.com/Baidu_Inc/status/2053009538769735774",
+          "source": "x_baidu",
+          "image_url": "",
+          "highlights": [
+            "预训练成本仅对标模型约 6%",
+            "升级搜索、推理、知识问答和智能体能力",
+            "展示国产大模型工程化效率优势"
+          ],
+          "related_links": []
+        },
+        {
+          "title": "#5 腾讯混元 Hy3 预览版免费期结束，三项核心指标居首",
+          "summary": "腾讯混元 Hy3 预览版在 OpenRouter 为期两周的免费期结束，期间该模型在总令牌使用量、代码生成和工具调用三项指标上均位列第一，占据所有供应商中 15.4% 的市场份额。这反映出市场对 Hy3 在编程与智能体工具链方面的高度认可。现在预览版转为付费模式，但仍以有竞争力的价格提供，开发者可继续在 OpenRouter 上调用。Hy3 的表现进一步证明中国大模型在全球开发者生态中的渗透力与实用价值正在快速攀升。",
+          "url": "https://x.com/TencentHunyuan/status/2053073752431403482",
+          "source": "x_tencent_hunyuan",
+          "image_url": "",
+          "highlights": [
+            "令牌使用量、代码生成、工具调用三项第一",
+            "市场份额达 15.4%",
+            "预览版结束，转为付费但保持竞争力"
+          ],
+          "related_links": [
+            "https://openrouter.ai/tencent/hy3-preview"
+          ]
+        },
+        {
+          "title": "#6 StepAudio 2.5 TTS 语音竞技场盲测跻身全球前三",
+          "summary": "StepFun 推出的 StepAudio 2.5 TTS 在 Artificial Analysis 语音竞技场盲测中 Elo 评分 1187 分，位列全球第三，仅次于 Inworld TTS 1.5 Max 与 Google Gemini 3.1 Flash TTS，并以 8 分优势超越 Eleven v3。该模型语音自然度较前代显著提升，定价为 85 美元/百万字符，生成速度 37.6 字符/秒，并提供全局上下文提示与行内情感标签两种控制方式。这一成绩表明中国 TTS 模型已跻身全球第一梯队，并且在速度与成本间取得了具备竞争力的平衡。",
+          "url": "https://x.com/StepFun_ai/status/2052963182587584878",
+          "source": "x_stepfun",
+          "image_url": "",
+          "highlights": [
+            "Elo 1187 分，全球第三",
+            "超越 Eleven v3 8 分",
+            "定价 85 美元/百万字符，速度 37.6 字符/秒"
+          ],
+          "related_links": []
+        },
+        {
+          "title": "#7 Qwen 系列多尺寸模型登陆 SiliconFlow 平台",
+          "summary": "阿里通义千问 Qwen 3.5 与 Qwen 3.6 系列正式在 SiliconFlow 上线，覆盖 9B 至 397B 参数，包含 MoE 与 Dense 架构，并原生支持多模态。具体模型包括 Qwen3.6-35B-A3B、Qwen3.6-27B，以及 Qwen3.5-397B-A17B、122B-A10B、35B-A3B、27B、9B 等。这种从轻量到超大规模的全矩阵部署，使开发者可根据任务需求灵活选择模型尺寸与架构，大幅降低了多场景适配的工程门槛，也推动国产开源大模型生态进一步碎片化竞争中的整合。",
+          "url": "https://x.com/SiliconFlowAI/status/2053035285974487369",
+          "source": "x_siliconflow",
+          "image_url": "",
+          "highlights": [
+            "覆盖 9B 到 397B，MoE 与 Dense 双架构",
+            "原生多模态支持",
+            "SiliconFlow 提供灵活部署选项"
+          ],
+          "related_links": [
+            "https://cloud.siliconflow.com/"
+          ]
+        }
+      ]
+    },
+    {
+      "heading": "开发生态",
+      "items": [
+        {
+          "title": "#8 Hermes Agent 登顶 OpenRouter 全球令牌排名",
+          "summary": "Nous Research 的 Hermes Agent 模型在 OpenRouter 平台的全球令牌使用量排名中升至第一，表明开发者社区对具备强代理能力的开源模型需求激增。Hermes Agent 专为工具调用与任务执行优化，其成功登顶反映出智能体工作流已成为当前 AI 应用的主流范式。Nous Research 借此感谢了贡献者与社区支持，同时预示着未来模型竞争将从单纯的文本生成转向面向复杂自主任务的综合能力比拼。",
+          "url": "https://x.com/OpenRouter/status/2052966744952897750",
+          "source": "x_openrouter",
+          "image_url": "",
+          "highlights": [
+            "令牌使用量排名第一",
+            "专为智能体场景优化",
+            "验证开发者对代理型模型的高需求"
+          ],
+          "related_links": []
+        },
+        {
+          "title": "#9 Google 开放 Fitbit Air 全新 Health API",
+          "summary": "Google 随新款 Fitbit Air 发布 Health API，向开发者开放 31 种健康数据点（运动、睡眠、心率、血氧等），支持 Webhooks 实时推送、精细读写权限控制以及按时间范围查询和汇总。开发者可借此构建 AI Agent、MCP Server、CLI 或实时监控系统等个人健康自动化应用。官方已发布入门指南，为个人健康数据驱动的 AI 创新铺设了标准化基础，或将催生一批新型健康管理智能体产品。",
+          "url": "https://x.com/berryxia/status/2053256690498433146",
+          "source": "x_berryxia",
+          "image_url": "",
+          "highlights": [
+            "31 种健康数据点，支持实时 Webhooks 推送",
+            "适用于 AI Agent、MCP Server 等应用构建",
+            "提供入门指南，降低健康 AI 开发门槛"
+          ],
+          "related_links": []
+        },
+        {
+          "title": "#10 Claude Code 连续发布 v2.1.137 与 v2.1.138 修复更新",
+          "summary": "Anthropic 的 Claude Code 开发者工具分别发布 v2.1.137 和 v2.1.138 两个版本。v2.1.137 修复了 VS Code 扩展在 Windows 上无法激活的问题，提升了跨平台稳定性；v2.1.138 则进行了一系列内部修复，优化底层性能。虽然无明显新功能，但连续的迭代表明 Claude Code 团队正积极响应用户反馈并提升可靠性，这对构建稳定 AI 编码助手生态至关重要，也为企业级采纳提供了更坚实的基础。",
+          "url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.137",
+          "source": "aihot:Claude Code",
+          "image_url": "https://opengraph.githubassets.com/ef6b4a98a1874c5ec9472720b7a2627d7d9032166ab90ca841424b85135cf2c3/anthropics/claude-code/releases/tag/v2.1.137",
+          "highlights": [
+            "v2.1.137 修复 Windows 上 VS Code 扩展激活问题",
+            "v2.1.138 进行内部优化与修复",
+            "持续迭代提升跨平台与稳定性"
+          ],
+          "related_links": []
+        },
+        {
+          "title": "#11 OpenRouter 推出帕累托代码：免费实验性编码路由工具",
+          "summary": "OpenRouter 发布名为“帕累托代码”的免费实验性路由工具，开发者可通过在请求中设置 min_coding_score 参数，自动将编码请求路由至符合质量门限且成本最低的模型，模型评分由 Artificial Analysis 提供。该工具实时展示帕累托前沿变化，帮助用户在成本与性能间做出最优权衡，尤其适用于大规模编码任务分发与模型评测场景，有望成为开发者优化推理成本的新利器。",
+          "url": "https://x.com/OpenRouter/status/2053170520087024109",
+          "source": "x_openrouter",
+          "image_url": "",
+          "highlights": [
+            "基于编码评分自动路由至成本最低模型",
+            "实时展示帕累托前沿",
+            "免费实验性工具，辅助成本与性能优化"
+          ],
+          "related_links": []
+        }
+      ]
+    },
+    {
+      "heading": "产品应用",
+      "items": [
+        {
+          "title": "#12 HappyHorse 视频模型上线阿里云，宣称“AI 视频无需等待”",
+          "summary": "阿里云 Model Studio 上线 HappyHorse 视频生成模型，主打基准测试排名第一、生成闪电速度和原生音视频同步能力。官方声称排队等待 AI 视频的时代已结束，用户可立即构建。虽然具体技术细节与定价未披露，但其高性能定位直接面向视频创作者与企业市场，预计将大幅缩短视频广告、社媒内容的生产周期，推动 AI 视频从尝鲜到实用化的关键转折。",
+          "url": "https://x.com/alibaba_cloud/status/2053153199561863454",
+          "source": "x_alicloud",
+          "image_url": "https://pbs.twimg.com/ext_tw_video_thumb/2053153178464522248/pu/img/lwKPI9tQoibqKcj9.jpg",
+          "highlights": [
+            "基准排名第一，原生音视频同步",
+            "闪电速度，无需排队",
+            "在阿里云 Model Studio 上线"
+          ],
+          "related_links": [
+            "https://int.alibabacloud.com/m/1000412167/"
+          ]
+        },
+        {
+          "title": "#13 Peekaboo 3.0 发布：专为 macOS 打造的 AI 操作与界面检测工具",
+          "summary": "Peekaboo 3.0 正式发布，被作者称为自 2.0 以来最重要版本，专注于以操作为先的 macOS 电脑使用体验。新版本融合了统一截图与界面检测功能，优化了 CLI 与 MCP 间的 JSON 交互，并增强了快照能力。作者表示此前模型能力不足无法实现，如今模型成熟使得这一工具成为可能。Peekaboo 3.0 可辅助自动化测试、界面分析等场景，进一步拓展了多模态模型在桌面操作中的落地可能性。",
+          "url": "https://x.com/steipete/status/2053114837698249190",
+          "source": "x_steipete",
+          "image_url": "",
+          "highlights": [
+            "统一截图与界面检测功能",
+            "优化 CLI + MCP JSON 交互",
+            "依赖最新模型能力，提升桌面自动化"
+          ],
+          "related_links": [
+            "https://peekaboo.sh"
+          ]
+        },
+        {
+          "title": "#14 苹果 Safari 浏览器将引入 AI 自动整理标签页功能",
+          "summary": "彭博社记者马克·古尔曼透露，适配 iOS 27、iPadOS 27 和 macOS 27 的 Safari 测试版新增“整理标签页”功能，可借助 AI 按浏览主题自动分组标签页。该功能未标注为 Apple Intelligence 套件的一部分，但其工作方式与备忘录智能分类类似。这是苹果自 2021 年推出标签组功能以来的一次重大升级，有望显著提升重度浏览器用户的效率，并暗示苹果正将 AI 能力更平滑地融入系统原生应用中。",
+          "url": "https://www.ithome.com/0/948/556.htm",
+          "source": "ithome",
+          "image_url": "",
+          "highlights": [
+            "按浏览主题自动分组标签页",
+            "类似于备忘录智能分类",
+            "将在 WWDC 中随新一代操作系统发布"
+          ],
+          "related_links": []
+        },
+        {
+          "title": "#15 Parloa 利用 OpenAI 模型构建企业级语音 AI 客服代理",
+          "summary": "对话式 AI 平台 Parloa 宣布基于 OpenAI 模型构建可扩展的语音驱动 AI 客服代理，支持企业设计、模拟和部署可靠、实时的客户交互。该方案结合语音识别、对话管理与情感感知，旨在创造客户愿意交流的服务体验，面向大型企业的客户服务场景。这再次印证 OpenAI 模型在企业级语音智能体市场的渗透，同时凸显了垂直行业对高可靠、可定制的语音 AI 方案的旺盛需求。",
+          "url": "https://openai.com/index/parloa",
+          "source": "openai_news",
+          "image_url": "",
+          "highlights": [
+            "基于 OpenAI 模型构建语音客服代理",
+            "支持设计、模拟与部署实时交互",
+            "面向大型企业客户服务场景"
+          ],
+          "related_links": []
+        }
+      ]
+    },
+    {
+      "heading": "技术与洞察",
+      "items": [
+        {
+          "title": "#16 OpenAI 发布 Codex 安全运行实践：沙箱、审批与遥测",
+          "summary": "OpenAI 发布《Running Codex safely》博文，系统阐述了如何通过沙箱隔离、审批机制、网络策略和代理原生遥测来安全运行 Codex，支持企业在符合合规要求的前提下使用编码代理。当前 AI 编码助手日益渗透开发流程，安全运行与输出管控成为企业采纳的关键瓶颈。OpenAI 公开其内部实践，不仅为行业提供了可参考的安全范式，也可能加速企业级 AI 编码工具的大规模部署。",
+          "url": "https://openai.com/index/running-codex-safely",
+          "source": "openai_news",
+          "image_url": "",
+          "highlights": [
+            "沙箱隔离与审批机制保障安全",
+            "网络策略与代理原生遥测监控",
+            "为企业级合规使用编码代理提供参考"
+          ],
+          "related_links": []
+        },
+        {
+          "title": "#17 OncoAgent：双层级多 Agent 框架实现隐私保护肿瘤临床决策支持",
+          "summary": "发表在 HuggingFace 博客的论文《OncoAgent: A Dual-Tier Multi-Agent Framework for Privacy-Preserving Oncology Clinical Decision Support》提出一种双层级多智能体框架，通过分层架构在保护患者隐私的前提下实现肿瘤诊疗决策支持。该框架利用多个协作代理分别处理脱敏医学数据与临床推理，旨在平衡数据利用与隐私安全，可能为医疗 AI 在敏感数据场景的合规落地提供新思路，也体现了多智能体系统在垂直行业的应用潜力。",
+          "url": "https://huggingface.co/blog/lablab-ai-amd-developer-hackathon/oncoagent-official-paper",
+          "source": "huggingface_blog",
+          "image_url": "",
+          "highlights": [
+            "双层级多 Agent 框架用于肿瘤临床决策",
+            "实现隐私保护下数据利用",
+            "展示多智能体在医疗敏感场景的潜力"
+          ],
+          "related_links": []
+        }
+      ]
+    },
+    {
+      "heading": "行业动态",
+      "items": [
+        {
+          "title": "#18 工信部启动人工智能科技伦理审查与服务先导计划",
+          "summary": "工业和信息化部启动人工智能科技伦理审查与服务先导计划，依托国家人工智能产业创新应用先导区，部署省级伦理审查制度细化、指导创新主体建设伦理委员会、开展审查实践与标准研制、构建部省市三级联动治理网络等四项重点任务。同时将设立全国伦理风险监测服务网络，编制培训教材并开设“伦理课堂”，推动人工智能负责任创新与产业高质量发展。该计划标志着中国 AI 治理从原则倡导进入体系化落地阶段，将为国内 AI 企业提供更清晰的合规路径。",
+          "url": "https://www.ithome.com/0/948/246.htm",
+          "source": "ithome",
+          "image_url": "",
+          "highlights": [
+            "四项任务：审查制度、伦理委员会、标准研制、治理网络",
+            "设全国伦理风险监测服务网络与伦理课堂",
+            "推动 AI 负责任创新与合规落地"
+          ],
+          "related_links": []
+        },
+        {
+          "title": "#19 华为芯片基础技术研究实验室亮相，任正非罕见出镜",
+          "summary": "华为练秋湖研发中心的“芯片基础技术研究实验室”在《新闻联播》中公开亮相，任正非同时以华为首席执行官身份罕见出镜。该实验室可能支撑麒麟芯片、鲲鹏处理器与昇腾 AI 芯片等核心产品的研发。练秋湖研发中心是华为全球最大研发基地，总占地 2400 亩，计划引进 3 万多名研发人才。这一曝光传递出华为在底层芯片技术领域持续攻坚的信号，也表明其在 AI 基础硬件方面保持长期战略投入。",
+          "url": "https://www.ithome.com/0/948/553.htm",
+          "source": "ithome",
+          "image_url": "",
+          "highlights": [
+            "芯片基础技术研究实验室公开亮相",
+            "支撑麒麟、鲲鹏、昇腾等芯片研发",
+            "任正非罕见出镜，练秋湖研发中心引关注"
+          ],
+          "related_links": []
+        }
+      ]
+    }
+  ]
+}
