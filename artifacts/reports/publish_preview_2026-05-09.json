@@ -1,0 +1,24 @@
+{
+  "date": "2026-05-09",
+  "target_repo": "caojiajun777/ai-daily-agent",
+  "title": "AI 早报 2026-05-09",
+  "labels": [
+    "ai-daily",
+    "agent-generated"
+  ],
+  "body_preview": "# OpenAI 推出 GPT-5.5 网络可信访问，测试 ChatGPT 广告，并发布实时语音模型\n\n> 日期：2026-05-09\n\n> OpenAI 发布 GPT-5.5 及 GPT-5.5-Cyber 并扩展网络安全可信访问，同时在 ChatGPT 中开始测试广告，推出新实时语音 API 模型；社区贡献 CyberSecQwen-4B 与 EMO 预训练混合专家模型。\n\n## 要闻\n\n- **#1 OpenAI 扩展网络安全可信访问，推出 GPT-5.5 和 GPT-5.5-Cyber** — OpenAI 扩大网络安全可信访问，推出 GPT-5.5 与 GPT-5.5-Cyber，帮助验证防御者加速漏洞研究与关键基础设施保护。  \n  [https://openai.com/index/gpt-5-5-with-trusted-access-for-cyber](https://openai.com/index/gpt-5-5-with-trusted-access-for-cyber) _(source: openai_news)_\n- **#2 OpenAI 发布新实时语音模型 API** — OpenAI API 新增实时语音模型，支持推理、翻译与转录，带来更自然、更智能的语音交互体验。  \n  [https://openai.com/index/advancing-voice-intelligence-with-new-models-in-the-api](https://openai.com/index/advancing-voice-intelligence-with-new-models-in-the-api) _(source: openai_news)_\n\n## 模型发布\n\n- **#3 CyberSecQwen-4B：为防御性网络量身的小型专业模型** — 发布 CyberSecQwen-4B，专为防御性网络设计的小型、专业化、本地可运行模型，突显小模型在网络安全中的价值。  \n  [https://huggingface.co/blog/lablab-ai-amd-developer-hackathon/cybersecqwen-4b](https://huggingface.co/blog/lablab-ai-amd-developer-hackathon/cybersecqwen-4b) _(source: huggingface_blog)_\n- **#4 EMO：预训练混合专家模型实现涌现模块化** — 提出 EMO 预训练混合专家方法，通过预训练促成模型的涌现模块化，提升效率与表现。  \n  [https://huggingface.co/blog/allenai/emo](https://huggingface.co/blog/allenai/emo) _(source: huggingface_blog)_\n\n## 开发生态\n\n- **#5 OpenAI 安全运行 Codex 的方法** — OpenAI 介绍安全运行 Codex 的实践：沙箱、审批、网络策略与代理原生遥测，保障编码代理的安全合规。  \n  [https://openai.com/index/running-codex-safely](https://openai.com/index/running-codex-safely) _(source: openai_news)_\n- **#6 Simplex 借助 Codex 重塑软件开发\n…[truncated]",
+  "body_length": 3195,
+  "gate_result": {
+    "ok": true,
+    "blocked_reasons": []
+  },
+  "duplicates": [],
+  "duplicate_blocked": false,
+  "force": false,
+  "draft_md_path": "artifacts\\drafts\\2026-05-09.md",
+  "draft_json_path": "artifacts\\drafts\\2026-05-09.json",
+  "report_path": "artifacts\\reports\\2026-05-09.json",
+  "ts": 1778341804.605088,
+  "mode": "dry-run",
+  "would_publish": true
+}
