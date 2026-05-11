@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}AI 日报 — {{ date }}{% endblock %}
+{% block content %}
+
+<div class="hero">
+  <h1>{{ date }}</h1>
+  <p>
+    <a href="/archive">← 归档</a>
+  </p>
+</div>
+
+<div class="card">
+  <div class="report-content">
+    {{ md_html | safe }}
+  </div>
+</div>
+
+{% endblock %}
