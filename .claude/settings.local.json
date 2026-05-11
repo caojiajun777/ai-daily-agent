@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(curl -sL --max-time 15 \"https://aihot.virxact.com/daily\")"
+    ]
+  }
+}
