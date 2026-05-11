@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}AI 日报{% endblock %}</title>
+<style>
+  :root {
+    --bg: #fafbfc; --card: #fff; --text: #1a1a2e; --muted: #6b7280;
+    --border: #e5e7eb; --accent: #2563eb; --accent2: #7c3aed;
+    --green: #059669; --red: #dc2626; --orange: #d97706;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .nav { background: var(--card); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; gap: 24px; height: 56px; position: sticky; top: 0; z-index: 10; }
+  .nav-brand { font-weight: 700; font-size: 18px; color: var(--text); }
+  .nav-brand span { color: var(--accent2); }
+  .nav-link { font-size: 14px; color: var(--muted); padding: 4px 0; border-bottom: 2px solid transparent; }
+  .nav-link:hover, .nav-link.active { color: var(--text); border-bottom-color: var(--accent); text-decoration: none; }
+  .nav-right { margin-left: auto; display: flex; gap: 16px; align-items: center; }
+  .nav-badge { background: var(--accent2); color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+
+  .container { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+  .hero { text-align: center; padding: 48px 0 24px; }
+  .hero h1 { font-size: 28px; margin-bottom: 8px; }
+  .hero p { color: var(--muted); font-size: 15px; }
+
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 12px; margin: 24px 0; }
+  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
+  .stat-value { font-size: 24px; font-weight: 700; }
+  .stat-label { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .stat-green { color: var(--green); }
+  .stat-red { color: var(--red); }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+  .card h2 { font-size: 18px; margin-bottom: 12px; }
+  .card h3 { font-size: 16px; margin: 8px 0 4px; }
+
+  .report-list { list-style: none; }
+  .report-list li { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .report-list li:hover { background: #f9fafb; }
+  .report-date { font-weight: 600; }
+  .report-meta { font-size: 13px; color: var(--muted); }
+  .report-status { font-size: 12px; padding: 2px 8px; border-radius: 4px; }
+  .status-ok { background: #ecfdf5; color: var(--green); }
+  .status-fail { background: #fef2f2; color: var(--red); }
+  .status-review { background: #fffbeb; color: var(--orange); }
+
+  .source-bar { display: flex; align-items: center; margin: 4px 0; gap: 8px; }
+  .source-name { width: 140px; font-size: 13px; text-align: right; flex-shrink: 0; }
+  .source-fill { height: 18px; background: var(--accent); border-radius: 3px; min-width: 4px; transition: width .3s; }
+  .source-count { font-size: 12px; color: var(--muted); }
+
+  .report-content { line-height: 2; }
+  .report-content h1 { font-size: 22px; border-bottom: 2px solid var(--text); padding-bottom: 8px; margin: 16px 0; }
+  .report-content h2 { font-size: 18px; margin: 24px 0 8px; }
+  .report-content h3 { font-size: 16px; margin: 16px 0 4px; }
+  .report-content blockquote { border-left: 3px solid var(--border); padding: 4px 16px; color: var(--muted); margin: 8px 0; }
+  .report-content img { max-width: 100%; border-radius: 4px; margin: 8px 0; }
+  .report-content hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+  .footer { text-align: center; padding: 32px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); margin-top: 48px; }
+
+  @media (max-width: 640px) {
+    .nav { gap: 12px; padding: 0 12px; }
+    .hero { padding: 24px 0 16px; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<nav class="nav">
+  <a href="/" class="nav-brand">AI<span>日报</span></a>
+  {% set current = request.url.path %}
+  <a href="/" class="nav-link {% if current == '/' %}active{% endif %}">首页</a>
+  <a href="/archive" class="nav-link {% if '/archive' in current %}active{% endif %}">归档</a>
+  <a href="/stats" class="nav-link {% if '/stats' in current %}active{% endif %}">统计</a>
+  <div class="nav-right">
+    <span class="nav-badge">{{ stats.subscriber_count if stats else 0 }} 订阅者</span>
+  </div>
+</nav>
+<div class="container">
+{% block content %}{% endblock %}
+</div>
+<footer class="footer">
+  AI 日报 · 全自动生成 · 每日 12:00 更新 · <a href="https://github.com/caojiajun777/ai-daily-agent">GitHub</a>
+</footer>
+</body>
+</html>
