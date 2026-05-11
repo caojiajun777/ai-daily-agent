@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}AI 日报 — {{ latest.date if latest else '' }}{% endblock %}
+{% block content %}
+
+<div class="hero">
+  <h1>AI 日报</h1>
+  <p>每日中午 12:00 自动生成，覆盖全球 AI 领域最新动态</p>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card"><div class="stat-value">{{ stats.report_count }}</div><div class="stat-label">已发布报告</div></div>
+  <div class="stat-card"><div class="stat-value">{{ stats.total_items }}</div><div class="stat-label">累计资讯条目</div></div>
+  <div class="stat-card"><div class="stat-value stat-green">{{ (stats.total_tokens_in / 1000)|int }}K</div><div class="stat-label">LLM Token 输入</div></div>
+  <div class="stat-card"><div class="stat-value">{{ stats.subscriber_count }}</div><div class="stat-label">订阅用户</div></div>
+</div>
+
+{% if latest %}
+<div class="card">
+  <h2>最新一期 — {{ latest.date }}</h2>
+  <div class="report-meta" style="margin-bottom:16px">
+    {{ latest.item_count }} 条资讯 · {{ latest.section_count }} 个板块 · {{ latest.provider }}/{{ latest.model }}
+  </div>
+  <div class="report-content">
+    {{ md_html | safe }}
+  </div>
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:48px">
+  <p style="color:var(--muted)">暂无报告。部署后每天中午 12:00 自动生成。</p>
+</div>
+{% endif %}
+
+{% endblock %}
