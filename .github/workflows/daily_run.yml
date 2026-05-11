@@ -118,6 +118,10 @@ jobs:
             > "artifacts/reports/scout_${{ steps.date.outputs.date }}.json" || true
           echo "Scout report saved to artifacts/reports/scout_${{ steps.date.outputs.date }}.json"
 
+      - name: Install Playwright browser
+        if: ${{ inputs.dry_run != 'true' }}
+        run: python -m playwright install chromium
+
       - name: Send PDF via email
         if: ${{ inputs.dry_run != 'true' }}
         env:
