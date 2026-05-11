@@ -1,0 +1,154 @@
+name: Agent — Daily Run & Publish
+
+# Runs every day at 08:00 Beijing time (UTC 00:00).
+#
+# Token policy: GITHUB_PUBLISH_TOKEN must be the repo owner's PAT.
+# Issues created by github-actions[bot] lack proper authorship for audit
+# attribution. GITHUB_TOKEN is explicitly refused by the publisher.
+#
+# Required repository secrets:
+#   DEEPSEEK_API_KEY       — DeepSeek API key for the LLM run
+#   GITHUB_PUBLISH_TOKEN   — Repo owner PAT with issues:write scope
+#   PUBLISH_REPO           — Target repo, e.g. "caojiajun777/ai-daily-agent"
+#   PUBLISH_ISSUE_LABELS   — Comma-separated labels, e.g. "ai-daily,agent-generated"
+#   X_BEARER_TOKEN         — (optional) X API v2 Bearer Token for social-graph diffusion
+#   SMTP_USER              — sender email, e.g. 905562805@qq.com
+#   SMTP_PASSWORD          — QQ邮箱 SMTP 授权码 (NOT QQ password)
+
+on:
+  schedule:
+    - cron: "0 4 * * *"   # 12:00 CST = 04:00 UTC
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Override logical date (YYYY-MM-DD). Defaults to today (Asia/Shanghai)."
+        required: false
+        type: string
+      dry_run:
+        description: "Preview only — do not create the GitHub issue."
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: read
+
+jobs:
+  daily-report:
+    name: Generate & publish daily report
+    runs-on: ubuntu-latest
+    env:
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      GITHUB_PUBLISH_TOKEN: ${{ secrets.GITHUB_PUBLISH_TOKEN }}
+      PUBLISH_REPO: ${{ secrets.PUBLISH_REPO }}
+      PUBLISH_ISSUE_LABELS: ${{ secrets.PUBLISH_ISSUE_LABELS }}
+      X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      EMAIL_SUBSCRIBERS: ${{ secrets.EMAIL_SUBSCRIBERS }}
+
+    steps:
+      - name: Refuse to run without owner PAT
+        if: ${{ env.GITHUB_PUBLISH_TOKEN == '' }}
+        run: |
+          echo "::error::GITHUB_PUBLISH_TOKEN secret is not set."
+          echo "Issues must be created with the repo owner's PAT, not GITHUB_TOKEN."
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Resolve report date
+        id: date
+        run: |
+          if [ -n "${{ inputs.date }}" ]; then
+            echo "date=${{ inputs.date }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "date=$(TZ=Asia/Shanghai date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ─────────────────────────────────────────────────────────
+      # Stage 1: Run the daily AI report pipeline
+      # ─────────────────────────────────────────────────────────
+      - name: Run pipeline
+        run: |
+          python -m agent.cli run \
+            --provider deepseek \
+            --date "${{ steps.date.outputs.date }}"
+
+      # ─────────────────────────────────────────────────────────
+      # Stage 2: Publish to GitHub Issues
+      # ─────────────────────────────────────────────────────────
+      - name: Publish (dry-run preview)
+        if: ${{ inputs.dry_run == 'true' }}
+        run: |
+          python -m agent.cli publish-issue \
+            --run-id "${{ steps.date.outputs.date }}" \
+            --dry-run
+
+      - name: Publish (confirmed)
+        if: ${{ inputs.dry_run != 'true' }}
+        run: |
+          python -m agent.cli publish-issue \
+            --run-id "${{ steps.date.outputs.date }}" \
+            --confirm
+
+      # ─────────────────────────────────────────────────────────
+      # Stage 3: Source Scout — discover new info sources daily
+      #
+      # Runs after publish so it uses today's curated items for
+      # content-link diffusion. Output is saved for human review;
+      # sources are NOT auto-committed to the config.
+      # ─────────────────────────────────────────────────────────
+      - name: Discover new sources (scout)
+        if: ${{ inputs.dry_run != 'true' }}
+        run: |
+          mkdir -p artifacts/reports
+          python -m agent.cli scout \
+            --topic broad \
+            --provider deepseek \
+            --run-id "${{ steps.date.outputs.date }}" \
+            --json \
+            > "artifacts/reports/scout_${{ steps.date.outputs.date }}.json" || true
+          echo "Scout report saved to artifacts/reports/scout_${{ steps.date.outputs.date }}.json"
+
+      - name: Send PDF via email
+        if: ${{ inputs.dry_run != 'true' }}
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        run: |
+          python -m agent.cli send --run-id "${{ steps.date.outputs.date }}"
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-daily-${{ steps.date.outputs.date }}
+          retention-days: 30
+          path: |
+            artifacts/drafts/${{ steps.date.outputs.date }}.md
+            artifacts/drafts/${{ steps.date.outputs.date }}.json
+            artifacts/drafts/${{ steps.date.outputs.date }}_v1.md
+            artifacts/drafts/${{ steps.date.outputs.date }}_v2.md
+            artifacts/reports/${{ steps.date.outputs.date }}.json
+            artifacts/reports/publish_result_${{ steps.date.outputs.date }}.json
+            artifacts/reports/semantic_duplicates_${{ steps.date.outputs.date }}.json
+            artifacts/reports/repair_${{ steps.date.outputs.date }}.json
+            artifacts/reports/scout_${{ steps.date.outputs.date }}.json
+            artifacts/curated/${{ steps.date.outputs.date }}.json
+            artifacts/traces/${{ steps.date.outputs.date }}.jsonl
+          if-no-files-found: warn
