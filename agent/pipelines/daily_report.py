@@ -22,12 +22,7 @@ from typing import Any, Dict, Optional
 
 from agent.agents.collector import collect
 from agent.agents.critic import deterministic_critique
-from agent.agents.curator import curate_with_records, curate_with_llm
-from agent.agents.event_clusterer import cluster_items as cluster_events
-from agent.agents.event_scorer import score_events as score_events_rules
-from agent.agents.research_editor import run_research_editor
-from agent.agents.final_selector import select_final_items
-from agent.agents.history_checker import load_recent_titles
+from agent.agents.curator import curate_with_records
 from agent.agents.publisher import publish_local
 from agent.agents.repairer import repair_draft, RepairerFailed
 from agent.agents.semantic_duplicate_critic import (
@@ -50,100 +45,6 @@ from agent.schemas import (
 )
 
 
-def _run_research_editor_flow(
-    *,
-    raw_items,
-    sources,
-    provider,
-    tracer,
-    budget,
-    candidate_top_k: int,
-    final_min: int,
-    final_max: int,
-    history_days: int,
-    enable_evidence: bool,
-    evidence_timeout: float,
-    llm_timeout: int,
-    artifacts_root: str,
-):
-    """Run the full Research Editor curation pipeline.
-
-    Flow: Cluster → Score → HistoryCheck → [Evidence] → ResearchEditor → FinalSelect
-    Returns (curated_items, curated_records, editorial_meta).
-    """
-    editorial_meta: Dict[str, Any] = {"fallback_used": False, "fallback_reason": ""}
-
-    # 1. Event Clustering.
-    events = cluster_events(raw_items)
-    tracer.log("event_clustering", raw=len(raw_items), events=len(events))
-    editorial_meta["raw_item_count"] = len(raw_items)
-    editorial_meta["clustered_event_count"] = len(events)
-
-    # 2. History check.
-    import os as _os
-    history_titles: List[str] = []
-    try:
-        repo = _os.getenv("PUBLISH_REPO", "")
-        token = _os.getenv("GITHUB_PUBLISH_TOKEN", "") or _os.getenv("GITHUB_TOKEN", "")
-        history_titles = load_recent_titles(
-            artifacts_dir=artifacts_root,
-            window_days=history_days,
-            repo=repo, token=token,
-        )
-    except Exception:
-        pass
-
-    # 3. Rule-based scoring.
-    events = score_events_rules(events, history_titles=history_titles,
-                                max_items=candidate_top_k)
-    editorial_meta["candidate_top_k"] = len(events)
-
-    # 4. Evidence fetch (optional).
-    if enable_evidence:
-        try:
-            from agent.tools.evidence_fetcher import fetch_evidence_for_events
-            url_lists = [e.source_urls for e in events]
-            evidence_list = fetch_evidence_for_events(
-                url_lists, timeout=evidence_timeout,
-            )
-            editorial_meta["evidence_fetch_success"] = sum(
-                1 for evlist in evidence_list for e in evlist if e.fetch_status == "ok"
-            )
-            editorial_meta["evidence_fetch_failed"] = sum(
-                1 for evlist in evidence_list for e in evlist if e.fetch_status != "ok"
-            )
-        except Exception:
-            evidence_list = []
-            editorial_meta["evidence_fetch_error"] = "exception"
-    else:
-        evidence_list = []
-
-    # 5. Research Editor (LLM).
-    editor_output = run_research_editor(
-        events=events,
-        evidence=evidence_list if evidence_list else None,
-        history_titles=history_titles,
-        provider=provider,
-        tracer=tracer,
-        budget=budget,
-        timeout_sec=llm_timeout,
-    )
-
-    llm_selected = len([d for d in editor_output.selected if d.decision == "select"])
-    editorial_meta["llm_selected_count"] = llm_selected
-
-    # 6. Final selection with fallback.
-    curated, curated_records, sel_meta = select_final_items(
-        editor_output=editor_output,
-        events=events,
-        min_items=final_min,
-        max_items=final_max,
-    )
-    editorial_meta.update(sel_meta)
-
-    return curated, curated_records, editorial_meta
-
-
 def _enrich_images_for_draft(draft, tracer, timeout: float = 4.0) -> int:
     """Post-writer enrichment: fetch og:image for article-page URLs only.
 
@@ -154,23 +55,12 @@ def _enrich_images_for_draft(draft, tracer, timeout: float = 4.0) -> int:
     Runs after the draft is validated. Failures are per-item and silent.
     """
     from agent.tools.image_extractor import extract_image
-    from urllib.parse import urlparse
-
-    # IT之家 image extraction is too unreliable — skip.
-    _SKIP = {"ithome.com", "x.com", "twitter.com", "github.com",
-             "youtube.com", "youtu.be", "arxiv.org"}
 
     count = 0
     for section in draft.sections:
         for item in section.items:
             url = item.url
             if not url or not url.startswith(("http://", "https://")):
-                continue
-            try:
-                domain = urlparse(url).netloc.lower().replace("www.", "")
-                if domain in _SKIP:
-                    continue
-            except Exception:
                 continue
             try:
                 img = extract_image(url, timeout=timeout)
@@ -181,43 +71,6 @@ def _enrich_images_for_draft(draft, tracer, timeout: float = 4.0) -> int:
                 pass
     if count > 0 and tracer:
         tracer.log("image_enrichment", enriched=count)
-    return count
-
-
-def _enrich_vision_for_draft(draft, tracer, max_items: int = 6) -> int:
-    """Post-image enrichment: describe images with Qwen VL for richer context.
-
-    Runs after image extraction. Adds a Chinese description of each image
-    to the item summary so the writer has visual context.
-    """
-    from agent.tools.vision_enricher import describe_image
-
-    count = 0
-    for section in draft.sections:
-        for item in section.items:
-            img_url = item.image_url
-            if not img_url:
-                continue
-            if any(w in img_url.lower() for w in ("logo", "icon", "avatar", "t.png", "qrcode")):
-                continue
-            try:
-                desc = describe_image(
-                    img_url,
-                    title=item.title,
-                    article_text=item.summary,
-                )
-                if desc:
-                    # Blend vision insight naturally into the summary.
-                    item.summary = f"{item.summary}（配图显示：{desc}）"
-                    count += 1
-            except Exception:
-                pass
-            if count >= max_items:
-                break
-        if count >= max_items:
-            break
-    if count > 0 and tracer:
-        tracer.log("vision_enrichment", enriched=count)
     return count
 
 
@@ -298,85 +151,19 @@ def run_pipeline(
     s = state.stage("curate")
     s.mark_running()
     tracer.log_stage("curate", "running")
-
-    # Read curation config.
-    curation_cfg = cfg.get("curation", {})
-    curation_mode = curation_cfg.get("mode", "research_editor")
-    candidate_top_k = int(curation_cfg.get("candidate_top_k", 40))
-    final_min = int(curation_cfg.get("final_min_items", 16))
-    final_max = int(curation_cfg.get("final_max_items", 22))
-    history_days = int(curation_cfg.get("history_window_days", 7))
-    fallback_enabled = bool(curation_cfg.get("fallback_to_rules", True))
-    enable_evidence = bool(curation_cfg.get("enable_evidence_fetch", False))
-    evidence_timeout = float(curation_cfg.get("evidence_fetch_timeout_sec", 8))
-    llm_timeout = int(curation_cfg.get("llm_rerank_timeout_sec", 60))
-
     try:
-        # ── Fallback: rules_only mode ────────────────────────────
-        if curation_mode == "rules_only":
-            curated, curated_records = curate_with_records(
-                raw, source_specs=sources,
-                max_items=int(run_cfg.get("max_items_curate", 20)),
-            )
-
-        # ── Legacy LLM scoring (disabled by default) ─────────────
-        elif curation_mode == "legacy_llm_scoring":
-            if not curation_cfg.get("legacy_llm_scoring_enabled", False):
-                raise ValueError("legacy_llm_scoring is disabled. Set curation.legacy_llm_scoring_enabled=true")
-            curated, curated_records = curate_with_llm(
-                items=raw, source_specs=sources, provider=provider,
-                max_items=int(run_cfg.get("max_items_curate", 20)),
-                tracer=tracer, budget=budget,
-            )
-
-        # ── Research Editor mode (default) ───────────────────────
-        else:  # research_editor
-            curated, curated_records, editorial_meta = _run_research_editor_flow(
-                raw_items=raw, sources=sources, provider=provider,
-                tracer=tracer, budget=budget,
-                candidate_top_k=candidate_top_k,
-                final_min=final_min, final_max=final_max,
-                history_days=history_days,
-                enable_evidence=enable_evidence,
-                evidence_timeout=evidence_timeout,
-                llm_timeout=llm_timeout,
-                artifacts_root=artifacts_root,
-            )
-            # Write editorial meta to trace.
-            for key in ("fallback_used", "fallback_reason", "llm_selected_count",
-                         "final_selected_count"):
-                if key in editorial_meta:
-                    s.meta[key] = editorial_meta[key]
-            if editorial_meta.get("fallback_used"):
-                tracer.log("curate_fallback", reason=editorial_meta.get("fallback_reason", ""))
-
+        curated, curated_records = curate_with_records(
+            raw,
+            source_specs=sources,
+            max_items=int(run_cfg.get("max_items_curate", 12)),
+        )
         s.meta["curated_item_count"] = len(curated)
         s.mark_ok()
-        tracer.log_stage("curate", "ok", count=len(curated),
-                         mode=curation_mode)
-
+        tracer.log_stage("curate", "ok", count=len(curated))
     except Exception as e:
         s.mark_failed(str(e))
         tracer.log_stage("curate", "failed", error=str(e))
-        # If fallback enabled, try rules_only as last resort.
-        if fallback_enabled and curation_mode == "research_editor":
-            try:
-                curated, curated_records = curate_with_records(
-                    raw, source_specs=sources,
-                    max_items=int(run_cfg.get("max_items_curate", 20)),
-                )
-                s.meta["curated_item_count"] = len(curated)
-                s.mark_ok()
-                s.meta["fallback_used"] = True
-                s.meta["fallback_reason"] = str(e)
-                tracer.log_stage("curate", "ok", count=len(curated),
-                                 fallback_used=True, fallback_reason=str(e))
-            except Exception as e2:
-                return _finalize(state, tracer, budget, reports_dir,
-                                 draft_path=None, curated_path=None)
-        else:
-            return _finalize(state, tracer, budget, reports_dir,
-                             draft_path=None, curated_path=None)
+        return _finalize(state, tracer, budget, reports_dir, draft_path=None, curated_path=None)
 
     if not curated:
         # No content is a soft failure; mark downstream stages skipped.
@@ -441,10 +228,6 @@ def run_pipeline(
 
         # ── Enrich items with og:image from source URLs ───────────────
         _enrich_images_for_draft(draft, tracer, timeout=6.0)
-
-        # ── Vision enrichment: describe images with Qwen VL ──────────
-        if run_cfg.get("enable_vision_enrichment", False):
-            _enrich_vision_for_draft(draft, tracer)
 
     except WriterFailed as e:
         s.mark_needs_review(str(e))

@@ -1,17 +1,16 @@
 run:
   timezone: "Asia/Shanghai"
   max_items_collect: 200
-  max_items_curate: 24
+  max_items_curate: 20
   language: "zh-CN"
-  enable_vision_enrichment: true
 
 llm:
   default_provider: "deepseek"
   default_model: "deepseek-v4-pro"
   temperature: 0.3
-  max_output_tokens: 8000
-  request_timeout_s: 180
-  max_retries: 0
+  max_output_tokens: 16000
+  request_timeout_s: 120
+  max_retries: 2
   sem_dup_max_tokens: 2048
   repair_max_tokens: 2048
 
@@ -32,18 +31,6 @@ eval:
     - "作为AI"
     - "I cannot"
     - "Lorem ipsum"
-
-curation:
-  mode: "research_editor"   # rules_only | research_editor | legacy_llm_scoring
-  candidate_top_k: 40
-  final_min_items: 16
-  final_max_items: 22
-  history_window_days: 7
-  fallback_to_rules: true
-  legacy_llm_scoring_enabled: false
-  enable_evidence_fetch: false   # off by default — adds ~20s per run
-  evidence_fetch_timeout_sec: 8
-  llm_rerank_timeout_sec: 60
 
 publish:
   # Publish gate: a draft must clear ALL of these before an issue is created.
@@ -72,42 +59,42 @@ sources:
 
   # --- 国际官方 ---
   - id: "x_openai"
-    type: "x_cookie"
+    type: "x"
     username: "OpenAI"
     account_type: "official"
     weight: 1.3
     max_items: 8
 
   - id: "x_anthropic"
-    type: "x_cookie"
+    type: "x"
     username: "AnthropicAI"
     account_type: "official"
     weight: 1.2
     max_items: 8
 
   - id: "x_googledeepmind"
-    type: "x_cookie"
+    type: "x"
     username: "GoogleDeepMind"
     account_type: "official"
     weight: 1.2
     max_items: 8
 
   - id: "x_metaai"
-    type: "x_cookie"
+    type: "x"
     username: "AIatMeta"
     account_type: "official"
     weight: 1.1
     max_items: 6
 
   - id: "x_mistralai"
-    type: "x_cookie"
+    type: "x"
     username: "MistralAI"
     account_type: "official"
     weight: 1.1
     max_items: 6
 
   - id: "x_stabilityai"
-    type: "x_cookie"
+    type: "x"
     username: "StabilityAI"
     account_type: "official"
     weight: 0.9
@@ -115,84 +102,84 @@ sources:
 
   # --- 国内官方 ---
   - id: "x_deepseek"
-    type: "x_cookie"
+    type: "x"
     username: "deepseek_ai"
     account_type: "official"
     weight: 1.4
     max_items: 8
 
   - id: "x_baidu"
-    type: "x_cookie"
+    type: "x"
     username: "Baidu_Inc"
     account_type: "official"
     weight: 1.1
     max_items: 6
 
   - id: "x_alicloud"
-    type: "x_cookie"
+    type: "x"
     username: "alibaba_cloud"
     account_type: "official"
     weight: 1.1
     max_items: 6
 
   - id: "x_qwen"
-    type: "x_cookie"
+    type: "x"
     username: "Alibaba_Qwen"
     account_type: "official"
     weight: 1.2
     max_items: 6
 
   - id: "x_zhipu"
-    type: "x_cookie"
+    type: "x"
     username: "ChatGLM"
     account_type: "official"
     weight: 1.1
     max_items: 6
 
   - id: "x_stepfun"
-    type: "x_cookie"
+    type: "x"
     username: "StepFun_ai"
     account_type: "official"
     weight: 1.0
     max_items: 5
 
   - id: "x_tencent_hunyuan"
-    type: "x_cookie"
+    type: "x"
     username: "TencentHunyuan"
     account_type: "official"
     weight: 1.0
     max_items: 5
 
   - id: "x_siliconflow"
-    type: "x_cookie"
+    type: "x"
     username: "SiliconFlowAI"
     account_type: "official"
     weight: 0.9
     max_items: 5
 
   - id: "x_01ai"
-    type: "x_cookie"
+    type: "x"
     username: "01AI_Yi"
     account_type: "official"
     weight: 1.0
     max_items: 5
 
   - id: "x_moonshot"
-    type: "x_cookie"
+    type: "x"
     username: "moonshot_ai"
     account_type: "official"
     weight: 1.0
     max_items: 5
 
   - id: "x_minimax"
-    type: "x_cookie"
+    type: "x"
     username: "MiniMax_AI"
     account_type: "official"
     weight: 0.9
     max_items: 5
 
   - id: "x_kuaishou_kling"
-    type: "x_cookie"
+    type: "x"
     username: "Kling_AI"
     account_type: "official"
     weight: 0.9
@@ -201,28 +188,28 @@ sources:
   # --- 硅谷领军人物 ---
   # 大厂核心人物：一手产品/研究动态往往先在个人号上出现
   - id: "x_sama"
-    type: "x_cookie"
+    type: "x"
     username: "sama"
     account_type: "official"
     weight: 1.4
     max_items: 5
 
   - id: "x_gdb"
-    type: "x_cookie"
+    type: "x"
     username: "gdb"
     account_type: "official"
     weight: 1.3
     max_items: 5
 
   - id: "x_ilyasut"
-    type: "x_cookie"
+    type: "x"
     username: "ilyasut"
     account_type: "kol"
     weight: 1.2
     max_items: 5
 
   - id: "x_clem"
-    type: "x_cookie"
+    type: "x"
     username: "clem"
     account_type: "official"
     weight: 1.1
@@ -230,35 +217,35 @@ sources:
 
   # --- 顶级研究者 / KOL ---
   - id: "x_karpathy"
-    type: "x_cookie"
+    type: "x"
     username: "kaboroje"
     account_type: "kol"
     weight: 1.3
     max_items: 5
 
   - id: "x_ylecun"
-    type: "x_cookie"
+    type: "x"
     username: "ylecun"
     account_type: "kol"
     weight: 1.2
     max_items: 5
 
   - id: "x_jimfan"
-    type: "x_cookie"
+    type: "x"
     username: "jimfan"
     account_type: "kol"
     weight: 1.1
     max_items: 5
 
   - id: "x_AndrewYNg"
-    type: "x_cookie"
+    type: "x"
     username: "AndrewYNg"
     account_type: "kol"
     weight: 1.0
     max_items: 5
 
   - id: "x_fchollet"
-    type: "x_cookie"
+    type: "x"
     username: "fchollet"
     account_type: "kol"
     weight: 1.1
@@ -267,7 +254,7 @@ sources:
   # --- 一手爆料 / 论文速递 ---
   # AK 是 X 上最高产的 AI 论文分享者，新 paper 几乎都在这里首发
   - id: "x_akhaliq"
-    type: "x_cookie"
+    type: "x"
     username: "_akhaliq"
     account_type: "kol"
     weight: 1.1
@@ -275,7 +262,7 @@ sources:
 
   # Simon Willison：AI 工具链与开发者生态的深度观察
   - id: "x_simonw"
-    type: "x_cookie"
+    type: "x"
     username: "simonw"
     account_type: "kol"
     weight: 1.0
@@ -283,7 +270,7 @@ sources:
 
   # George Hotz (tinygrad)：开源 AI 硬件 + 另类技术路线
   - id: "x_tinygrad"
-    type: "x_cookie"
+    type: "x"
     username: "__tinygrad__"
     account_type: "kol"
     weight: 0.9
@@ -291,21 +278,21 @@ sources:
 
   # --- 中文 KOL ---
   - id: "x_dotey"
-    type: "x_cookie"
+    type: "x"
     username: "dotey"
     account_type: "kol"
     weight: 1.0
     max_items: 5
 
   - id: "x_ayi"
-    type: "x_cookie"
+    type: "x"
     username: "AYi_AInotes"
     account_type: "kol"
     weight: 1.0
     max_items: 5
 
   - id: "x_yi_ding"
-    type: "x_cookie"
+    type: "x"
     username: "YiChuaCai"
     account_type: "kol"
     weight: 0.9
@@ -351,26 +338,6 @@ sources:
     max_items: 6
 
   # ═══════════════════════════════════════════════════════════════
-  # ═══════════════════════════════════════════════════════════════
-  # arXiv — top AI venue papers only (NeurIPS/ICML/ICLR/CVPR/ACL etc.)
-  # ═══════════════════════════════════════════════════════════════
-  - id: "arxiv_top_venue"
-    type: "arxiv"
-    categories: "cs.AI+OR+cs.CL+OR+cs.LG+OR+cs.CV+OR+cs.MA+OR+stat.ML"
-    max_age_days: 7
-    top_venue_only: true
-    weight: 1.0
-    max_items: 100
-
-  # ═══════════════════════════════════════════════════════════════
-  # HuggingFace Daily Papers — community-curated top ML papers
-  # ═══════════════════════════════════════════════════════════════
-  - id: "hf_daily_papers"
-    type: "rss"
-    url: "https://huggingface.co/papers/feed.xml"
-    weight: 0.9
-    max_items: 15
-
   # RSS — 研究与模型平台
   # ═══════════════════════════════════════════════════════════════
   - id: "huggingface_blog"

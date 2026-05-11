@@ -42,7 +42,7 @@ def md_to_html(md_text: str, title: str = "AI 日报") -> str:
 <style>
   body {{
     max-width: 720px; margin: 0 auto; padding: 32px 16px;
-    font-family: "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
     font-size: 15px; line-height: 1.8; color: #222; background: #fff;
   }}
   h1 {{ font-size: 22px; border-bottom: 2px solid #1a1a2e; padding-bottom: 8px; }}

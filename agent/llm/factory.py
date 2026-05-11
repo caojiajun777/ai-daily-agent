@@ -20,10 +20,6 @@ def build_provider(name: str, model: Optional[str] = None, **kwargs) -> LLMProvi
         from agent.llm.deepseek_provider import DeepSeekProvider
 
         return DeepSeekProvider(model=model or "deepseek-v4-pro", **kwargs)
-    if name == "qwen":
-        from agent.llm.qwen_provider import QwenProvider
-
-        return QwenProvider(model=model or "qwen3.6-plus", **kwargs)
     if name == "anthropic":
         from agent.llm.anthropic_provider import AnthropicProvider
 

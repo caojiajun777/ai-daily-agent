@@ -19,15 +19,6 @@ import yaml
 from agent.harness.replay import replay
 from agent.llm import build_provider
 
-# Auto-load .env so users don't need to set env vars manually each time.
-try:
-    from dotenv import load_dotenv as _load_dotenv
-    _env_path = os.path.join(os.path.dirname(__file__), os.pardir, ".env")
-    _env_path = os.path.normpath(_env_path)
-    if os.path.exists(_env_path):
-        _load_dotenv(_env_path)
-except ImportError:
-    pass
 
 CFG_PATH = os.path.join(os.path.dirname(__file__), "configs", "default.yaml")
 PROMPTS_PATH = os.path.join(os.path.dirname(__file__), "configs", "prompts.yaml")
@@ -521,50 +512,6 @@ def cmd_send(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_trends(args: argparse.Namespace) -> int:
-    cfg = load_yaml(CFG_PATH)
-    provider_name = args.provider or cfg.get("llm", {}).get("default_provider", "deepseek")
-    model = args.model or cfg.get("llm", {}).get("default_model")
-    try:
-        provider = build_provider(provider_name, model=model)
-    except Exception as e:
-        print(f"failed to build provider: {e}", file=sys.stderr)
-        return 3
-
-    from agent.agents.trend_analyzer import analyze_trends, analyze_multi_window
-
-    if args.multi_window:
-        windows = [int(w.strip()) for w in args.multi_window.split(",") if w.strip().isdigit()]
-        result = analyze_multi_window(
-            provider=provider, artifacts_dir=args.artifacts or "artifacts",
-            windows=windows,
-        )
-        for label, r in result.items():
-            _print_trend_result(label, r)
-        return 0
-
-    r = analyze_trends(
-        provider=provider, artifacts_dir=args.artifacts or "artifacts",
-        days=args.days,
-    )
-    _print_trend_result(f"{args.days}d", r)
-    return 0 if r.get("ok") else 1
-
-
-def _print_trend_result(label: str, r: dict) -> None:
-    print(f"\n=== Trends [{label}] ===")
-    if r.get("error"):
-        print(f"  Error: {r['error']}")
-        return
-    fb = " (metrics-only fallback)" if r.get("fallback_used") else ""
-    print(f"  findings: {r.get('findings', 0)}{fb}")
-    print(f"  weak_signals: {r.get('weak_signals', 0)}")
-    print(f"  noise/hype: {r.get('noise', 0)}")
-    print(f"  validation warnings: {r.get('warnings', 0)}")
-    for path_type, path in r.get("paths", {}).items():
-        print(f"  saved: {path}")
-
-
 def cmd_verify_gitblog(args: argparse.Namespace) -> int:
     from agent.agents.gitblog_verifier import verify_gitblog
     from agent.tools.gitblog_verifier import (
@@ -757,17 +704,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_send.add_argument("--no-pdf", action="store_true", help="skip PDF, send HTML only")
     p_send.add_argument("--artifacts", default="artifacts")
     p_send.set_defaults(func=cmd_send)
-
-    p_trends = sub.add_parser(
-        "trends",
-        help="analyze industry trends from past daily reports",
-    )
-    p_trends.add_argument("--days", type=int, default=7, help="days of history to analyze")
-    p_trends.add_argument("--multi-window", default=None, help="comma-separated windows, e.g. 4,7,14,30")
-    p_trends.add_argument("--provider", default=None)
-    p_trends.add_argument("--model", default=None)
-    p_trends.add_argument("--artifacts", default="artifacts")
-    p_trends.set_defaults(func=cmd_trends)
 
     p_verify = sub.add_parser(
         "verify-gitblog",

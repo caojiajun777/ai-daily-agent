@@ -82,8 +82,7 @@ _AI_KEYWORDS_EN = [
     "quantization", "lora", "qlora", "distillation",
 ]
 
-_CN_GENERAL_SOURCES = {"ithome"}
-_AI_GUARANTEED_SOURCES = {"arxiv_top_venue", "arxiv_ai", "arxiv_cs", "hf_daily_papers"}
+_CN_GENERAL_SOURCES = {"ithome"}  # sources that cover broad tech, not just AI
 
 
 def _is_ai_relevant(title: str, summary: str = "", source_id: str = "") -> bool:
@@ -95,8 +94,6 @@ def _is_ai_relevant(title: str, summary: str = "", source_id: str = "") -> bool:
     """
     text = (title + " " + summary).lower()
     is_general_source = source_id in _CN_GENERAL_SOURCES
-    if source_id in _AI_GUARANTEED_SOURCES:
-        return True  # arxiv papers are AI by definition
 
     cn_hits = sum(1 for kw in _AI_KEYWORDS_CN if kw.lower() in text)
     en_hits = sum(1 for kw in _AI_KEYWORDS_EN if kw in text)
@@ -127,10 +124,7 @@ def _relevance_boost(title: str, summary: str = "", source_id: str = "") -> floa
     total_hits = cn_hits + en_hits
 
     is_general = source_id in _CN_GENERAL_SOURCES
-    is_guaranteed = source_id in _AI_GUARANTEED_SOURCES
 
-    if is_guaranteed:
-        return 1.0   # arxiv papers are AI by definition
     if total_hits >= 5:
         return 1.2   # strongly AI-related: slight boost
     if total_hits >= 2:
@@ -273,260 +267,7 @@ def curate_with_records(
         scored.append((score, curated, record))
 
     scored.sort(key=lambda x: x[0], reverse=True)
-    top = _select_with_paper_quota(scored, max_items, min_papers=5)
+    top = scored[:max_items]
     writer_items = [c for _, c, _ in top]
     records = [rec for _, _, rec in top]
     return writer_items, records
-
-
-_MIN_PAPERS = 5
-
-
-def _select_with_paper_quota(
-    scored: List[Tuple[float, CuratedItem, CuratedItemRecord]],
-    max_items: int,
-    min_papers: int = 5,
-) -> List[Tuple[float, CuratedItem, CuratedItemRecord]]:
-    """Select top-N items, ensuring at least min_papers arxiv papers.
-
-    If the top-N doesn't include enough arxiv papers, we pull the
-    highest-scoring arxiv papers from ANY position in the scored list
-    and swap them in, pushing out the lowest-scoring non-arxiv items.
-    """
-    # Find ALL arxiv items in the full scored list and their best scores.
-    all_arxiv = [(s, c, r) for s, c, r in scored if "arxiv" in r.source_name]
-    all_arxiv.sort(key=lambda x: x[0], reverse=True)
-
-    # Separate arxiv and non-arxiv in the top-N.
-    top = list(scored[:max_items])
-    arxiv_in_top = [(s, c, r) for s, c, r in top if "arxiv" in r.source_name]
-
-    if len(arxiv_in_top) >= min_papers:
-        return top
-
-    # Find the best arxiv papers that are NOT in the top (or use all if no more).
-    top_arxiv_ids = {r.raw_item_id for _, _, r in arxiv_in_top}
-    arxiv_not_in_top = [(s, c, r) for s, c, r in all_arxiv if r.raw_item_id not in top_arxiv_ids]
-    arxiv_not_in_top.sort(key=lambda x: x[0], reverse=True)
-
-    needed = min_papers - len(arxiv_in_top)
-    to_add = arxiv_not_in_top[:needed]
-
-    # Remove lowest-scoring non-arxiv from top to make room.
-    non_arxiv_top = [(s, c, r) for s, c, r in top if "arxiv" not in r.source_name]
-    non_arxiv_top.sort(key=lambda x: x[0])  # ascending — lowest first
-    to_remove = non_arxiv_top[:len(to_add)]
-
-    remove_ids = {r.raw_item_id for _, _, r in to_remove}
-    result = [(s, c, r) for s, c, r in top if r.raw_item_id not in remove_ids]
-    result.extend(to_add)
-    result.sort(key=lambda x: x[0], reverse=True)
-    return result[:max_items]
-
-
-# ═══════════════════════════════════════════════════════════════════════
-# LLM-powered curation — replaces deterministic scoring with LLM judgment
-# ═══════════════════════════════════════════════════════════════════════
-
-_LLM_CURATION_PROMPT = """你是一个 AI 新闻编辑。你需要从一批 AI 领域候选资讯中选出今天最值得报道的条目。
-
-评分标准（每项 1-10 分）：
-- **独家性**：这条消息是否是独家/首发？是否来自一手官方渠道？（独家爆料、官方首发=高分，转述/旧闻=低分）
-- **影响力**：对 AI 行业、开发者或用户的影响有多大？（模型发布、重大融资、政策变化=高分）
-- **时效性**：是否是最近 24 小时内的新消息？
-- **稀缺性**：这类消息在其他源中是否少见？（同质化严重的模型发布可以适当降低）
-
-输出严格 JSON 数组，每个元素为：
-{
-  "index": 候选列表中的序号(从0开始),
-  "title": "原标题",
-  "score": 1-10 的整数,
-  "reason": "一句话说明评分理由"
-}
-
-只返回得分 >= 5 的条目，按得分从高到低排列。最多返回 25 条。"""
-
-
-def llm_score_items(
-    *,
-    items: List[RawItem],
-    provider,
-    tracer=None,
-    budget=None,
-    max_to_score: int = 30,
-) -> Dict[str, float]:
-    """Ask an LLM to score candidate items by news importance.
-
-    Returns a dict mapping ``source_id::url`` → LLM importance score (0.0-1.0).
-    Items not scored by the LLM default to 0.5 (neutral).
-    """
-    from agent.llm.base import LLMMessage
-
-    # Truncate to manageable size — LLM scores the top candidates.
-    to_score = items[:max_to_score]
-
-    # Build candidate list for the prompt.
-    item_lines: List[str] = []
-    for idx, it in enumerate(to_score):
-        src_label = it.source_id
-        summary_short = it.summary[:150].replace("\n", " ")
-        item_lines.append(f"[{idx}] [{src_label}] {it.title}")
-        if summary_short:
-            item_lines.append(f"    摘要: {summary_short}")
-
-    user_msg = "请对以下 AI 新闻候选条目打分：\n\n" + "\n".join(item_lines)
-
-    llm_scores: Dict[str, float] = {}
-
-    try:
-        if budget:
-            budget.check_can_call(stage="curate")
-
-        response = provider.complete(
-            messages=[
-                LLMMessage(role="system", content=_LLM_CURATION_PROMPT),
-                LLMMessage(role="user", content=user_msg),
-            ],
-            temperature=0.1,
-            max_output_tokens=2048,
-        )
-
-        if tracer:
-            tracer.log_llm_call(
-                provider=provider.name, model=provider.model,
-                prompt=_LLM_CURATION_PROMPT + "\n" + user_msg,
-                output=response.text, latency_ms=response.latency_ms,
-                status="ok", stage="curate",
-            )
-
-        if budget:
-            budget.record(
-                stage="curate", input_tokens=response.input_tokens_est,
-                output_tokens=response.output_tokens_est,
-            )
-
-        # Parse LLM output.
-        import json as _json, re as _re
-        raw = response.text.strip()
-        # Strip think blocks and code fences.
-        raw = _re.sub(r"<think>[\s\S]*?</think>", "", raw, flags=_re.IGNORECASE).strip()
-        m = _re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
-        if m:
-            raw = m.group(1).strip()
-        else:
-            start = raw.find("[")
-            end = raw.rfind("]")
-            if start != -1 and end != -1:
-                raw = raw[start:end + 1]
-
-        scored_list = _json.loads(raw)
-        if not isinstance(scored_list, list):
-            return llm_scores
-
-        for entry in scored_list:
-            idx = int(entry.get("index", -1))
-            score = float(entry.get("score", 5))
-            if 0 <= idx < len(to_score):
-                key = f"{to_score[idx].source_id}::{to_score[idx].url}"
-                llm_scores[key] = min(1.0, max(0.1, score / 10.0))
-
-    except Exception as e:
-        if tracer:
-            tracer.log("llm_curation_failed", error=str(e))
-
-    return llm_scores
-
-
-def curate_with_llm(
-    *,
-    items: List[RawItem],
-    source_specs: List[Dict[str, Any]],
-    provider,
-    max_items: int = 20,
-    tracer=None,
-    budget=None,
-) -> Tuple[List[CuratedItem], List[CuratedItemRecord]]:
-    """Curate items using LLM importance scoring + deterministic filtering.
-
-    Flow:
-      1. Deterministic dedup + AI-relevance filter (same as before).
-      2. LLM scores remaining items by news importance (独家性/影响力).
-      3. Combine: LLM_score × 0.6 + deterministic_score × 0.4.
-      4. Apply source diversity penalty to the combined score.
-      5. Sort and take top-N.
-    """
-    weights: Dict[str, float] = {
-        s.get("id", ""): float(s.get("weight", 1.0)) for s in source_specs
-    }
-    seen_titles: Dict[str, str] = {}
-    seen_urls: set = set()
-    now_ts = _time.time()
-
-    # Phase 1: Dedup + AI-relevance filter (deterministic).
-    deduped: List[RawItem] = []
-    for it in items:
-        if not it.title or not it.url:
-            continue
-        nt = _norm_title(it.title)
-        if not nt or nt in seen_titles or it.url in seen_urls:
-            continue
-        if _relevance_boost(it.title, it.summary, it.source_id) == 0.0:
-            continue
-        seen_titles[nt] = _dup_group_id(nt)
-        seen_urls.add(it.url)
-        deduped.append(it)
-
-    # Phase 2: LLM importance scoring.
-    llm_scores = llm_score_items(
-        items=deduped, provider=provider, tracer=tracer, budget=budget,
-    )
-
-    # Phase 3: Combine scores.
-    scored: List[Tuple[float, CuratedItem, CuratedItemRecord]] = []
-    source_scored_count: Dict[str, int] = Counter()
-
-    for it in deduped:
-        w = weights.get(it.source_id, 1.0)
-        r = _recency_score(it.published_at, now_ts)
-        det_score = w * r
-
-        key = f"{it.source_id}::{it.url}"
-        llm_s = llm_scores.get(key, 0.5)  # default neutral if LLM didn't score
-
-        combined = llm_s * 0.65 + det_score * 0.35
-
-        # Source diversity.
-        source_count = source_scored_count.get(it.source_id, 0)
-        div_penalty = 1.0
-        if source_count >= 6:
-            div_penalty = 0.6
-        elif source_count >= 4:
-            div_penalty = 0.75
-        elif source_count >= 3:
-            div_penalty = 0.85
-
-        final_score = combined * div_penalty
-        source_scored_count[it.source_id] += 1
-
-        reasons = [f"llm={llm_s:.2f}", f"det={det_score:.2f}"]
-        if div_penalty < 1.0:
-            reasons.append(f"div={div_penalty:.2f}")
-
-        curated = CuratedItem(
-            title=it.title, url=it.url, summary=it.summary[:500],
-            source=it.source_id, source_type=it.source_type,
-            published_at=it.published_at, score=round(final_score, 4),
-        )
-        record = CuratedItemRecord(
-            raw_item_id=_raw_item_id(it), title=it.title,
-            source_url=it.url, source_name=it.source_id,
-            published_at=it.published_at or None,
-            score=round(final_score, 4), section=None,
-            selected_reason="; ".join(reasons),
-            duplicate_group_id=None, used_in_draft=True,
-        )
-        scored.append((final_score, curated, record))
-
-    scored.sort(key=lambda x: x[0], reverse=True)
-    top = _select_with_paper_quota(scored, max_items, min_papers=_MIN_PAPERS)
-    return [c for _, c, _ in top], [rec for _, _, rec in top]

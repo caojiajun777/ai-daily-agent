@@ -16,7 +16,7 @@ jobs:
     name: Check source & pipeline health
     runs-on: ubuntu-latest
     env:
-      GITHUB_PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+      GITHUB_PUBLISH_TOKEN: ${{ secrets.GITHUB_PUBLISH_TOKEN }}
       PUBLISH_REPO: ${{ secrets.PUBLISH_REPO }}
       SMTP_USER: ${{ secrets.SMTP_USER }}
       SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}

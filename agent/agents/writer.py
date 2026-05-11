@@ -101,22 +101,12 @@ def write_draft(
     raw = _extract_json(resp.text)
     try:
         payload = json.loads(raw)
-    except json.JSONDecodeError as e1:
-        # Retry once with temperature 0.0 for deterministic JSON.
+    except json.JSONDecodeError:
         try:
-            retry_resp = provider.complete(
-                messages, temperature=0.0, max_output_tokens=max_output_tokens,
-                response_format={"type": "json_object"},
-            )
-            raw2 = _extract_json(retry_resp.text)
-            payload = json.loads(raw2)
-            budget.record(stage="write",
-                          input_tokens=retry_resp.input_tokens_est,
-                          output_tokens=retry_resp.output_tokens_est)
+            repaired = _repair_json(raw)
+            payload = json.loads(repaired)
         except (json.JSONDecodeError, Exception) as e2:
-            raise WriterFailed(
-                f"writer output is not valid JSON after retry: {e2}"
-            ) from e1
+            raise WriterFailed(f"writer output is not valid JSON: {e2}") from e2
     try:
         draft = Draft.model_validate(payload)
     except ValidationError as e:

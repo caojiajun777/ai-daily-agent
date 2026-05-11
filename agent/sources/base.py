@@ -51,14 +51,9 @@ def build_source(spec: Dict[str, Any]) -> SourceAdapter:
             url=spec["url"],
         )
     if t == "arxiv":
-        from agent.sources.arxiv_adapter import ArxivAdapter
+        from agent.sources.arxiv_stub import ArxivAdapter
 
-        return ArxivAdapter(
-            source_id=spec["id"],
-            categories=str(spec.get("categories", "cs.AI+OR+cs.CL+OR+cs.LG+OR+cs.CV")),
-            max_age_days=int(spec.get("max_age_days", 3)),
-            top_venue_only=bool(spec.get("top_venue_only", False)),
-        )
+        return ArxivAdapter(source_id=spec["id"])
     if t == "github_releases":
         from agent.sources.github_stub import GithubReleasesAdapter
 
@@ -71,15 +66,6 @@ def build_source(spec: Dict[str, Any]) -> SourceAdapter:
         from agent.sources.x_adapter import XAdapter
 
         return XAdapter(
-            source_id=spec["id"],
-            username=spec["username"],
-            account_type=spec.get("account_type", "official"),
-            max_age_hours=int(spec.get("max_age_hours", 36)),
-        )
-    if t == "x_cookie":
-        from agent.sources.x_cookie_adapter import XCookieAdapter
-
-        return XCookieAdapter(
             source_id=spec["id"],
             username=spec["username"],
             account_type=spec.get("account_type", "official"),

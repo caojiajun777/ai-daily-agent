@@ -77,7 +77,6 @@
   {% set current = request.url.path %}
   <a href="/" class="nav-link {% if current == '/' %}active{% endif %}">首页</a>
   <a href="/archive" class="nav-link {% if '/archive' in current %}active{% endif %}">归档</a>
-  <a href="/papers" class="nav-link {% if '/papers' in current %}active{% endif %}">论文</a>
   <a href="/stats" class="nav-link {% if '/stats' in current %}active{% endif %}">统计</a>
   <div class="nav-right">
     <span class="nav-badge">{{ stats.subscriber_count if stats else 0 }} 订阅者</span>

@@ -29,15 +29,6 @@ _TWITTER_IMAGE_RE = re.compile(
 _IMG_SRC_RE = re.compile(
     r'<img[^>]+src=["\']([^"\']+\.(?:png|jpg|jpeg|gif|webp|PNG|JPG|JPEG|GIF|WEBP))["\']',
 )
-# Lazy-loaded images often have the real URL in data-original or data-src.
-_DATA_ORIGINAL_RE = re.compile(
-    r'<img[^>]+data-original=["\']([^"\']+)["\']',
-    re.IGNORECASE,
-)
-_DATA_SRC_RE = re.compile(
-    r'<img[^>]+data-src=["\']([^"\']+)["\']',
-    re.IGNORECASE,
-)
 _HEAD_CLOSE_RE = re.compile(r"</head>", re.IGNORECASE)
 
 # ── Noise detection ─────────────────────────────────────────────────────
@@ -48,9 +39,7 @@ _NOISE_WORDS = [
     "button", "badge", "thumb-", "-thumb", "loading", "spinner",
     "emoji", "svg", "profile_images", "arrow.png", "arrow-",
     "weixin", "girl.png", "boy.png", "qr-icon", "share-icon",
-    "bg.", "_bg.", "header-bg", "thumbnail", "/thumb/", "thumb-",
-    "150x150", "240x240", "80x80", "100x100", "_240.", "_150.",
-    "related", "sidebar", "recommend",
+    "bg.", "_bg.", "header-bg",
 ]
 
 # ── Quality signals ─────────────────────────────────────────────────────
@@ -74,14 +63,13 @@ def _get_browser():
         from playwright.sync_api import sync_playwright
         _pw = sync_playwright().start()
         # Try Edge first (pre-installed on Windows), then Chrome, then default Chromium.
-        for channel in [None, "msedge", "chrome"]:
+        for channel in ["msedge", "chrome", None]:
             try:
                 kw = {
                     "headless": True,
                     "args": [
                         "--disable-blink-features=AutomationControlled",
                         "--no-sandbox",
-                        "--disable-gpu",
                     ],
                 }
                 if channel:
@@ -206,11 +194,6 @@ def _extract_via_playwright(url: str, timeout: float) -> str:
         candidates.append((_abs_url(m.group(1), url), 2))
     for m in _IMG_SRC_RE.finditer(html[:100000]):
         candidates.append((_abs_url(m.group(1), url), 3))
-    # Lazy-loaded: data-original, data-src (IT之家, qbitai, etc.)
-    for m in _DATA_ORIGINAL_RE.finditer(html[:100000]):
-        candidates.append((_abs_url(m.group(1), url), 3))
-    for m in _DATA_SRC_RE.finditer(html[:100000]):
-        candidates.append((_abs_url(m.group(1), url), 3))
 
     return _pick_best(candidates)
 
@@ -227,11 +210,6 @@ def _collect_candidates(html: str, base_url: str) -> List[Tuple[str, int]]:
     for m in _TWITTER_IMAGE_RE.finditer(head):
         candidates.append((_abs_url(m.group(1), base_url), 2))
     for m in _IMG_SRC_RE.finditer(body[:80000]):
-        candidates.append((_abs_url(m.group(1), base_url), 3))
-    # Lazy-loaded: data-original, data-src (IT之家, qbitai, etc.)
-    for m in _DATA_ORIGINAL_RE.finditer(body[:80000]):
-        candidates.append((_abs_url(m.group(1), base_url), 3))
-    for m in _DATA_SRC_RE.finditer(body[:80000]):
         candidates.append((_abs_url(m.group(1), base_url), 3))
 
     return candidates
@@ -282,14 +260,7 @@ def _score_image(url: str, source_priority: int) -> float:
     quality_hits = sum(1 for w in _QUALITY_WORDS if w in name_lower)
     score += min(quality_hits * 0.10, 0.30)
 
-    # UUID filename → article content image (e.g. d24f9aa6-b115-4223...).
-    if re.match(r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$", name, re.IGNORECASE):
-        score += 0.20
-
     path_lower = path.lower()
-    # IT之家 article body images (non-thumbnail CDN path).
-    if "newsuploadfiles" in path_lower and "thumbnail" not in path_lower:
-        score += 0.15
     # Tweet media images are high-quality content.
     if "pbs.twimg.com/media" in path_lower:
         score += 0.30

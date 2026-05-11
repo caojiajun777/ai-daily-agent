@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GITHUB_PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+      GITHUB_PUBLISH_TOKEN: ${{ secrets.GITHUB_PUBLISH_TOKEN }}
       PUBLISH_REPO: ${{ secrets.PUBLISH_REPO }}
 
     steps:
