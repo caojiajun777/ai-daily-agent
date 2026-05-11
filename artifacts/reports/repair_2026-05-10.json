@@ -1,0 +1,20 @@
+{
+  "date": "2026-05-10",
+  "run_id": "2026-05-10-2a06adad",
+  "attempted": true,
+  "succeeded": true,
+  "reason": "repaired 1 item(s)",
+  "actions": [
+    {
+      "section": "行业动态",
+      "removed_title": "#18 混元 Hy3 预览版商业化启动，OpenRouter 市场份额 15.4%",
+      "removed_url": "https://x.com/TencentHunyuan/status/2053073752431403482",
+      "replacement_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.138",
+      "replacement_title": "v2.1.138",
+      "reason": "与 #4 重复报道腾讯混元 Hy3 预览版结束免费期并在 OpenRouter 取得三项第一，删除行业动态中的重复条目，用 Claude Code 最新版本公告替换。"
+    }
+  ],
+  "pre_duplicate_count": 1,
+  "post_duplicate_count": 0,
+  "draft_version": "v2"
+}
