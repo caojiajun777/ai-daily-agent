@@ -1,0 +1,428 @@
+run:
+  timezone: "Asia/Shanghai"
+  max_items_collect: 200
+  max_items_curate: 20
+  language: "zh-CN"
+
+llm:
+  default_provider: "deepseek"
+  default_model: "deepseek-v4-pro"
+  temperature: 0.3
+  max_output_tokens: 16000
+  request_timeout_s: 120
+  max_retries: 2
+  sem_dup_max_tokens: 2048
+  repair_max_tokens: 2048
+
+budget:
+  max_total_input_tokens: 200000
+  max_total_output_tokens: 30000
+  max_total_calls: 40
+  hard_fail_on_exceed: true
+
+context:
+  max_messages_keep: 20
+  per_message_max_chars: 6000
+
+eval:
+  min_unique_titles_ratio: 0.8
+  min_section_count: 6
+  forbid_phrases:
+    - "作为AI"
+    - "I cannot"
+    - "Lorem ipsum"
+
+publish:
+  # Publish gate: a draft must clear ALL of these before an issue is created.
+  minimum_items: 3
+  max_eval_issues: 0
+  require_critic_pass: true
+  # Duplicate protection: when querying recent issues we look at this many.
+  recent_issues_to_check: 30
+  # Title prefix; final title is "<prefix><date>" e.g. "AI 早报 2026-05-09".
+  title_prefix: "AI 日报 "
+  # Labels applied to the created issue. Can be overridden by env
+  # PUBLISH_ISSUE_LABELS (comma-separated).
+  default_labels:
+    - "agent-generated"
+  # Email subscribers (comma-separated in env EMAIL_SUBSCRIBERS overrides this).
+  subscribers:
+    - "905562805@qq.com"
+    - "1780609071@qq.com"
+
+sources:
+  # ═══════════════════════════════════════════════════════════════
+  # X / Twitter — AI 行业一手消息的最快来源
+  # 需要环境变量 X_BEARER_TOKEN（X API v2 Basic, ~$100/mo）
+  # 无 TOKEN 时自动跳过，不影响其他源。
+  # ═══════════════════════════════════════════════════════════════
+
+  # --- 国际官方 ---
+  - id: "x_openai"
+    type: "x"
+    username: "OpenAI"
+    account_type: "official"
+    weight: 1.3
+    max_items: 8
+
+  - id: "x_anthropic"
+    type: "x"
+    username: "AnthropicAI"
+    account_type: "official"
+    weight: 1.2
+    max_items: 8
+
+  - id: "x_googledeepmind"
+    type: "x"
+    username: "GoogleDeepMind"
+    account_type: "official"
+    weight: 1.2
+    max_items: 8
+
+  - id: "x_metaai"
+    type: "x"
+    username: "AIatMeta"
+    account_type: "official"
+    weight: 1.1
+    max_items: 6
+
+  - id: "x_mistralai"
+    type: "x"
+    username: "MistralAI"
+    account_type: "official"
+    weight: 1.1
+    max_items: 6
+
+  - id: "x_stabilityai"
+    type: "x"
+    username: "StabilityAI"
+    account_type: "official"
+    weight: 0.9
+    max_items: 5
+
+  # --- 国内官方 ---
+  - id: "x_deepseek"
+    type: "x"
+    username: "deepseek_ai"
+    account_type: "official"
+    weight: 1.4
+    max_items: 8
+
+  - id: "x_baidu"
+    type: "x"
+    username: "Baidu_Inc"
+    account_type: "official"
+    weight: 1.1
+    max_items: 6
+
+  - id: "x_alicloud"
+    type: "x"
+    username: "alibaba_cloud"
+    account_type: "official"
+    weight: 1.1
+    max_items: 6
+
+  - id: "x_qwen"
+    type: "x"
+    username: "Alibaba_Qwen"
+    account_type: "official"
+    weight: 1.2
+    max_items: 6
+
+  - id: "x_zhipu"
+    type: "x"
+    username: "ChatGLM"
+    account_type: "official"
+    weight: 1.1
+    max_items: 6
+
+  - id: "x_stepfun"
+    type: "x"
+    username: "StepFun_ai"
+    account_type: "official"
+    weight: 1.0
+    max_items: 5
+
+  - id: "x_tencent_hunyuan"
+    type: "x"
+    username: "TencentHunyuan"
+    account_type: "official"
+    weight: 1.0
+    max_items: 5
+
+  - id: "x_siliconflow"
+    type: "x"
+    username: "SiliconFlowAI"
+    account_type: "official"
+    weight: 0.9
+    max_items: 5
+
+  - id: "x_01ai"
+    type: "x"
+    username: "01AI_Yi"
+    account_type: "official"
+    weight: 1.0
+    max_items: 5
+
+  - id: "x_moonshot"
+    type: "x"
+    username: "moonshot_ai"
+    account_type: "official"
+    weight: 1.0
+    max_items: 5
+
+  - id: "x_minimax"
+    type: "x"
+    username: "MiniMax_AI"
+    account_type: "official"
+    weight: 0.9
+    max_items: 5
+
+  - id: "x_kuaishou_kling"
+    type: "x"
+    username: "Kling_AI"
+    account_type: "official"
+    weight: 0.9
+    max_items: 5
+
+  # --- 硅谷领军人物 ---
+  # 大厂核心人物：一手产品/研究动态往往先在个人号上出现
+  - id: "x_sama"
+    type: "x"
+    username: "sama"
+    account_type: "official"
+    weight: 1.4
+    max_items: 5
+
+  - id: "x_gdb"
+    type: "x"
+    username: "gdb"
+    account_type: "official"
+    weight: 1.3
+    max_items: 5
+
+  - id: "x_ilyasut"
+    type: "x"
+    username: "ilyasut"
+    account_type: "kol"
+    weight: 1.2
+    max_items: 5
+
+  - id: "x_clem"
+    type: "x"
+    username: "clem"
+    account_type: "official"
+    weight: 1.1
+    max_items: 5
+
+  # --- 顶级研究者 / KOL ---
+  - id: "x_karpathy"
+    type: "x"
+    username: "kaboroje"
+    account_type: "kol"
+    weight: 1.3
+    max_items: 5
+
+  - id: "x_ylecun"
+    type: "x"
+    username: "ylecun"
+    account_type: "kol"
+    weight: 1.2
+    max_items: 5
+
+  - id: "x_jimfan"
+    type: "x"
+    username: "jimfan"
+    account_type: "kol"
+    weight: 1.1
+    max_items: 5
+
+  - id: "x_AndrewYNg"
+    type: "x"
+    username: "AndrewYNg"
+    account_type: "kol"
+    weight: 1.0
+    max_items: 5
+
+  - id: "x_fchollet"
+    type: "x"
+    username: "fchollet"
+    account_type: "kol"
+    weight: 1.1
+    max_items: 5
+
+  # --- 一手爆料 / 论文速递 ---
+  # AK 是 X 上最高产的 AI 论文分享者，新 paper 几乎都在这里首发
+  - id: "x_akhaliq"
+    type: "x"
+    username: "_akhaliq"
+    account_type: "kol"
+    weight: 1.1
+    max_items: 5
+
+  # Simon Willison：AI 工具链与开发者生态的深度观察
+  - id: "x_simonw"
+    type: "x"
+    username: "simonw"
+    account_type: "kol"
+    weight: 1.0
+    max_items: 5
+
+  # George Hotz (tinygrad)：开源 AI 硬件 + 另类技术路线
+  - id: "x_tinygrad"
+    type: "x"
+    username: "__tinygrad__"
+    account_type: "kol"
+    weight: 0.9
+    max_items: 5
+
+  # --- 中文 KOL ---
+  - id: "x_dotey"
+    type: "x"
+    username: "dotey"
+    account_type: "kol"
+    weight: 1.0
+    max_items: 5
+
+  - id: "x_ayi"
+    type: "x"
+    username: "AYi_AInotes"
+    account_type: "kol"
+    weight: 1.0
+    max_items: 5
+
+  - id: "x_yi_ding"
+    type: "x"
+    username: "YiChuaCai"
+    account_type: "kol"
+    weight: 0.9
+    max_items: 5
+
+  # ═══════════════════════════════════════════════════════════════
+  # RSS — 大厂官方博客
+  # ═══════════════════════════════════════════════════════════════
+  - id: "openai_news"
+    type: "rss"
+    url: "https://openai.com/news/rss.xml"
+    weight: 1.4
+    max_items: 12
+
+  - id: "anthropic_news"
+    type: "rss"
+    url: "https://www.anthropic.com/news/rss.xml"
+    weight: 1.3
+    max_items: 12
+
+  - id: "google_deepmind_blog"
+    type: "rss"
+    url: "https://deepmind.google/blog/rss.xml"
+    weight: 1.1
+    max_items: 8
+
+  - id: "google_ai_blog"
+    type: "rss"
+    url: "https://blog.google/technology/ai/rss/"
+    weight: 1.0
+    max_items: 8
+
+  - id: "meta_ai_blog"
+    type: "rss"
+    url: "https://ai.meta.com/blog/rss/"
+    weight: 1.0
+    max_items: 6
+
+  - id: "microsoft_ai_blog"
+    type: "rss"
+    url: "https://blogs.microsoft.com/ai/feed/"
+    weight: 1.0
+    max_items: 6
+
+  # ═══════════════════════════════════════════════════════════════
+  # RSS — 研究与模型平台
+  # ═══════════════════════════════════════════════════════════════
+  - id: "huggingface_blog"
+    type: "rss"
+    url: "https://huggingface.co/blog/feed.xml"
+    weight: 1.1
+    max_items: 10
+
+  - id: "paperswithcode_blog"
+    type: "rss"
+    url: "https://paperswithcode.com/blog/feed"
+    weight: 0.9
+    max_items: 6
+
+  # ═══════════════════════════════════════════════════════════════
+  # RSS — 国际科技媒体
+  # ═══════════════════════════════════════════════════════════════
+  - id: "mit_tech_review_ai"
+    type: "rss"
+    url: "https://www.technologyreview.com/feed/"
+    weight: 0.9
+    max_items: 6
+
+  - id: "venturebeat_ai"
+    type: "rss"
+    url: "https://venturebeat.com/category/ai/feed/"
+    weight: 0.9
+    max_items: 6
+
+  - id: "ars_technica_ai"
+    type: "rss"
+    url: "https://feeds.arstechnica.com/arstechnica/technology-lab"
+    weight: 0.8
+    max_items: 6
+
+  - id: "wired_ai"
+    type: "rss"
+    url: "https://www.wired.com/feed/tag/ai/latest/rss"
+    weight: 0.8
+    max_items: 5
+
+  # ═══════════════════════════════════════════════════════════════
+  # ═══════════════════════════════════════════════════════════════
+  # AI HOT Daily — curated Chinese AI news with source attribution
+  # ═══════════════════════════════════════════════════════════════
+  - id: "aihot_daily"
+    type: "aihot"
+    url: "https://aihot.virxact.com/daily"
+    weight: 0.85
+    max_items: 15
+
+  # RSS — 中文科技资讯
+  # weights intentionally lower: these cover broad tech, not pure AI.
+  # The curator's AI-relevance filter + diversity penalty prevents
+  # non-AI items and single-source dominance.
+  # ═══════════════════════════════════════════════════════════════
+  - id: "ithome"
+    type: "rss"
+    url: "https://www.ithome.com/rss/"
+    weight: 0.6
+    max_items: 8
+
+  - id: "jiqizhixin"
+    type: "rss"
+    url: "https://www.jiqizhixin.com/rss"
+    weight: 0.9
+    max_items: 8
+
+  - id: "qbitai"
+    type: "rss"
+    url: "https://www.qbitai.com/feed"
+    weight: 0.8
+    max_items: 6
+
+  # ═══════════════════════════════════════════════════════════════
+  # RSS — 简报与社区
+  # ═══════════════════════════════════════════════════════════════
+  - id: "the_batch"
+    type: "rss"
+    url: "https://www.deeplearning.ai/the-batch/feed/"
+    weight: 1.0
+    max_items: 6
+
+  - id: "import_ai"
+    type: "rss"
+    url: "https://jack-clark.net/feed/"
+    weight: 0.9
+    max_items: 5
