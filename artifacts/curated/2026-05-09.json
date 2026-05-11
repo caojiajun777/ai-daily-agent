@@ -1,0 +1,150 @@
+{
+  "date": "2026-05-09",
+  "run_id": "2026-05-09-2f09691b",
+  "items": [
+    {
+      "raw_item_id": "huggingface_blog::https://huggingface.co/blog/lablab-ai-amd-developer-hackathon/cybersecqwen-4b",
+      "title": "CyberSecQwen-4B: Why Defensive Cyber Needs Small, Specialized, Locally-Runnable Models",
+      "source_url": "https://huggingface.co/blog/lablab-ai-amd-developer-hackathon/cybersecqwen-4b",
+      "source_name": "huggingface_blog",
+      "published_at": "2026-05-08T09:41:05+00:00",
+      "score": 0.6753,
+      "section": "模型发布",
+      "selected_reason": "recency=0.675",
+      "duplicate_group_id": null,
+      "used_in_draft": true
+    },
+    {
+      "raw_item_id": "huggingface_blog::https://huggingface.co/blog/allenai/emo",
+      "title": "EMO: Pretraining mixture of experts for emergent modularity",
+      "source_url": "https://huggingface.co/blog/allenai/emo",
+      "source_name": "huggingface_blog",
+      "published_at": "2026-05-08T08:03:50+00:00",
+      "score": 0.6603,
+      "section": "模型发布",
+      "selected_reason": "recency=0.66",
+      "duplicate_group_id": null,
+      "used_in_draft": true
+    },
+    {
+      "raw_item_id": "openai_news::https://openai.com/index/running-codex-safely",
+      "title": "Running Codex safely at OpenAI",
+      "source_url": "https://openai.com/index/running-codex-safely",
+      "source_name": "openai_news",
+      "published_at": "2026-05-08T04:30:00+00:00",
+      "score": 0.6284,
+      "section": "开发生态",
+      "selected_reason": "recency=0.628",
+      "duplicate_group_id": null,
+      "used_in_draft": true
+    },
+    {
+      "raw_item_id": "openai_news::https://openai.com/index/gpt-5-5-with-trusted-access-for-cyber",
+      "title": "Scaling Trusted Access for Cyber with GPT-5.5 and GPT-5.5-Cyber",
+      "source_url": "https://openai.com/index/gpt-5-5-with-trusted-access-for-cyber",
+      "source_name": "openai_news",
+      "published_at": "2026-05-07T05:00:00+00:00",
+      "score": 0.4534,
+      "section": "要闻",
+      "selected_reason": "recency=0.453",
+      "duplicate_group_id": null,
+      "used_in_draft": true
+    },
+    {
+      "raw_item_id": "openai_news::https://openai.com/index/parloa",
+      "title": "Parloa builds service agents customers want to talk to",
+      "source_url": "https://openai.com/index/parloa",
+      "source_name": "openai_news",
+      "published_at": "2026-05-07T03:00:00+00:00",
+      "score": 0.441,
+      "section": "产品应用",
+      "selected_reason": "recency=0.441",
+      "duplicate_group_id": null,
+      "used_in_draft": true
+    },
+    {
+      "raw_item_id": "openai_news::https://openai.com/index/advancing-voice-intelligence-with-new-models-in-the-api",
+      "title": "Advancing voice intelligence with new models in the API",
+      "source_url": "https://openai.com/index/advancing-voice-intelligence-with-new-models-in-the-api",
+      "source_name": "openai_news",
+      "published_at": "2026-05-07T02:00:00+00:00",
+      "score": 0.4349,
+      "section": "要闻",
+      "selected_reason": "recency=0.435",
+      "duplicate_group_id": null,
+      "used_in_draft": true
+    },
+    {
+      "raw_item_id": "openai_news::https://openai.com/index/testing-ads-in-chatgpt",
+      "title": "Testing ads in ChatGPT",
+      "source_url": "https://openai.com/index/testing-ads-in-chatgpt",
+      "source_name": "openai_news",
+      "published_at": "2026-05-06T16:00:00+00:00",
+      "score": 0.3785,
+      "section": "行业动态",
+      "selected_reason": "recency=0.379",
+      "duplicate_group_id": null,
+      "used_in_draft": true
+    },
+    {
+      "raw_item_id": "openai_news::https://openai.com/index/introducing-trusted-contact-in-chatgpt",
+      "title": "Introducing Trusted Contact in ChatGPT",
+      "source_url": "https://openai.com/index/introducing-trusted-contact-in-chatgpt",
+      "source_name": "openai_news",
+      "published_at": "2026-05-06T16:00:00+00:00",
+      "score": 0.3785,
+      "section": "产品应用",
+      "selected_reason": "recency=0.379",
+      "duplicate_group_id": null,
+      "used_in_draft": true
+    },
+    {
+      "raw_item_id": "openai_news::https://openai.com/index/simplex",
+      "title": "Simplex rethinks software development with Codex",
+      "source_url": "https://openai.com/index/simplex",
+      "source_name": "openai_news",
+      "published_at": "2026-05-06T16:00:00+00:00",
+      "score": 0.3785,
+      "section": "开发生态",
+      "selected_reason": "recency=0.379",
+      "duplicate_group_id": null,
+      "used_in_draft": true
+    },
+    {
+      "raw_item_id": "huggingface_blog::https://huggingface.co/blog/ServiceNow-AI/correctness-before-corrections",
+      "title": "vLLM V0 to V1: Correctness Before Corrections in RL",
+      "source_url": "https://huggingface.co/blog/ServiceNow-AI/correctness-before-corrections",
+      "source_name": "huggingface_blog",
+      "published_at": "2026-05-06T11:06:55+00:00",
+      "score": 0.3537,
+      "section": "技术与洞察",
+      "selected_reason": "recency=0.354",
+      "duplicate_group_id": null,
+      "used_in_draft": true
+    },
+    {
+      "raw_item_id": "openai_news::https://openai.com/index/how-chatgpt-protects-privacy",
+      "title": "How ChatGPT learns about the world while protecting privacy",
+      "source_url": "https://openai.com/index/how-chatgpt-protects-privacy",
+      "source_name": "openai_news",
+      "published_at": "2026-05-06T00:00:00+00:00",
+      "score": 0.3031,
+      "section": "产品应用",
+      "selected_reason": "recency=0.303",
+      "duplicate_group_id": null,
+      "used_in_draft": true
+    },
+    {
+      "raw_item_id": "huggingface_blog::https://huggingface.co/blog/open-asr-leaderboard-private-data",
+      "title": "Adding Benchmaxxer Repellant to the Open ASR Leaderboard",
+      "source_url": "https://huggingface.co/blog/open-asr-leaderboard-private-data",
+      "source_name": "huggingface_blog",
+      "published_at": "2026-05-05T16:00:00+00:00",
+      "score": 0.2712,
+      "section": "技术与洞察",
+      "selected_reason": "recency=0.271",
+      "duplicate_group_id": null,
+      "used_in_draft": true
+    }
+  ]
+}
