@@ -1,0 +1,109 @@
+{
+  "date": "2026-05-09",
+  "title": "OpenAI 推出 GPT-5.5 网络可信访问，测试 ChatGPT 广告，并发布实时语音模型",
+  "overview": "OpenAI 发布 GPT-5.5 及 GPT-5.5-Cyber 并扩展网络安全可信访问，同时在 ChatGPT 中开始测试广告，推出新实时语音 API 模型；社区贡献 CyberSecQwen-4B 与 EMO 预训练混合专家模型。",
+  "sections": [
+    {
+      "heading": "要闻",
+      "items": [
+        {
+          "title": "#1 OpenAI 扩展网络安全可信访问，推出 GPT-5.5 和 GPT-5.5-Cyber",
+          "summary": "OpenAI 扩大网络安全可信访问，推出 GPT-5.5 与 GPT-5.5-Cyber，帮助验证防御者加速漏洞研究与关键基础设施保护。",
+          "url": "https://openai.com/index/gpt-5-5-with-trusted-access-for-cyber",
+          "source": "openai_news"
+        },
+        {
+          "title": "#2 OpenAI 发布新实时语音模型 API",
+          "summary": "OpenAI API 新增实时语音模型，支持推理、翻译与转录，带来更自然、更智能的语音交互体验。",
+          "url": "https://openai.com/index/advancing-voice-intelligence-with-new-models-in-the-api",
+          "source": "openai_news"
+        }
+      ]
+    },
+    {
+      "heading": "模型发布",
+      "items": [
+        {
+          "title": "#3 CyberSecQwen-4B：为防御性网络量身的小型专业模型",
+          "summary": "发布 CyberSecQwen-4B，专为防御性网络设计的小型、专业化、本地可运行模型，突显小模型在网络安全中的价值。",
+          "url": "https://huggingface.co/blog/lablab-ai-amd-developer-hackathon/cybersecqwen-4b",
+          "source": "huggingface_blog"
+        },
+        {
+          "title": "#4 EMO：预训练混合专家模型实现涌现模块化",
+          "summary": "提出 EMO 预训练混合专家方法，通过预训练促成模型的涌现模块化，提升效率与表现。",
+          "url": "https://huggingface.co/blog/allenai/emo",
+          "source": "huggingface_blog"
+        }
+      ]
+    },
+    {
+      "heading": "开发生态",
+      "items": [
+        {
+          "title": "#5 OpenAI 安全运行 Codex 的方法",
+          "summary": "OpenAI 介绍安全运行 Codex 的实践：沙箱、审批、网络策略与代理原生遥测，保障编码代理的安全合规。",
+          "url": "https://openai.com/index/running-codex-safely",
+          "source": "openai_news"
+        },
+        {
+          "title": "#6 Simplex 借助 Codex 重塑软件开发",
+          "summary": "Simplex 利用 ChatGPT Enterprise 和 Codex 加速软件设计、构建与测试，扩展 AI 驱动开发流程。",
+          "url": "https://openai.com/index/simplex",
+          "source": "openai_news"
+        }
+      ]
+    },
+    {
+      "heading": "产品应用",
+      "items": [
+        {
+          "title": "#7 Parloa 用 OpenAI 模型构建语音客服代理",
+          "summary": "Parloa 基于 OpenAI 模型打造可扩展的语音 AI 客服，帮助企业设计、模拟并部署实时可靠交互。",
+          "url": "https://openai.com/index/parloa",
+          "source": "openai_news"
+        },
+        {
+          "title": "#8 ChatGPT 引入信任联系人功能",
+          "summary": "ChatGPT 推出可选安全功能“信任联系人”，在检测到严重自伤风险时通知用户指定的可信任人员。",
+          "url": "https://openai.com/index/introducing-trusted-contact-in-chatgpt",
+          "source": "openai_news"
+        },
+        {
+          "title": "#9 ChatGPT 如何保护用户隐私",
+          "summary": "介绍 ChatGPT 减少训练数据中的个人信息，并让用户控制对话是否用于改进模型，强化隐私保护。",
+          "url": "https://openai.com/index/how-chatgpt-protects-privacy",
+          "source": "openai_news"
+        }
+      ]
+    },
+    {
+      "heading": "技术与洞察",
+      "items": [
+        {
+          "title": "#10 vLLM V0 至 V1：强化学习中的正确性先于纠正",
+          "summary": "探讨 vLLM 版本演进中“正确性优先于纠正”的强化学习策略，优化模型性能与可靠性。",
+          "url": "https://huggingface.co/blog/ServiceNow-AI/correctness-before-corrections",
+          "source": "huggingface_blog"
+        },
+        {
+          "title": "#11 开源 ASR 排行榜引入防作弊机制",
+          "summary": "开源自动语音识别（ASR）排行榜新增“Benchmaxxer 防护”技术，防止分数虚高，维护基准公正。",
+          "url": "https://huggingface.co/blog/open-asr-leaderboard-private-data",
+          "source": "huggingface_blog"
+        }
+      ]
+    },
+    {
+      "heading": "行业动态",
+      "items": [
+        {
+          "title": "#12 OpenAI 开始在 ChatGPT 中测试广告",
+          "summary": "OpenAI 开始测试 ChatGPT 广告，以支持免费访问，强调标识清晰、答案独立、隐私保护和用户控制。",
+          "url": "https://openai.com/index/testing-ads-in-chatgpt",
+          "source": "openai_news"
+        }
+      ]
+    }
+  ]
+}
