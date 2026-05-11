@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}AI 日报 — 统计{% endblock %}
+{% block content %}
+
+<div class="hero">
+  <h1>统计面板</h1>
+  <p>系统运行概览</p>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card"><div class="stat-value">{{ stats.report_count }}</div><div class="stat-label">已发布报告</div></div>
+  <div class="stat-card"><div class="stat-value">{{ stats.total_items }}</div><div class="stat-label">累计资讯条目</div></div>
+  <div class="stat-card"><div class="stat-value stat-green">{{ stats.total_llm_calls }}</div><div class="stat-label">LLM 调用次数</div></div>
+  <div class="stat-card"><div class="stat-value stat-green">{{ (stats.total_tokens_in / 1000)|int }}K</div><div class="stat-label">Token 输入总量</div></div>
+  <div class="stat-card"><div class="stat-value stat-green">{{ (stats.total_tokens_out / 1000)|int }}K</div><div class="stat-label">Token 输出总量</div></div>
+  <div class="stat-card"><div class="stat-value">{{ stats.subscriber_count }}</div><div class="stat-label">订阅用户</div></div>
+  {% if stats.failures > 0 %}
+  <div class="stat-card"><div class="stat-value stat-red">{{ stats.failures }}</div><div class="stat-label">失败次数</div></div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>信源分布 Top 20</h2>
+  {% set max_count = sources[0].count if sources else 1 %}
+  {% for s in sources[:20] %}
+  <div class="source-bar">
+    <span class="source-name">{{ s.source[:30] }}</span>
+    <span class="source-fill" style="width:{{ (s.count / max_count * 100)|int }}%"></span>
+    <span class="source-count">{{ s.count }}</span>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <h2>近期报告</h2>
+  <ul class="report-list">
+  {% for r in reports[:15] %}
+    <li>
+      <a href="/report/{{ r.date }}" class="report-date">{{ r.date }}</a>
+      <span class="report-meta">{{ r.item_count }} 条 · {{ r.provider }}/{{ r.model }}</span>
+    </li>
+  {% endfor %}
+  </ul>
+</div>
+
+{% endblock %}
