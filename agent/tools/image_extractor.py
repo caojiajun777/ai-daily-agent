@@ -74,7 +74,7 @@ def _get_browser():
         from playwright.sync_api import sync_playwright
         _pw = sync_playwright().start()
         # Try Edge first (pre-installed on Windows), then Chrome, then default Chromium.
-        for channel in ["msedge", "chrome", None]:
+        for channel in [None, "msedge", "chrome"]:
             try:
                 kw = {
                     "headless": True,
