@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.egg-info/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg
+node_modules/
+.DS_Store
+playwright-browsers/
+logs/
+*.tmp
+artifacts/
+Users*
