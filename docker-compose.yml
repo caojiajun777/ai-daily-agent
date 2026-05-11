@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  web:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./artifacts:/app/artifacts
+      - ./agent/configs:/app/agent/configs
+      - ./subscribers.txt:/app/subscribers.txt
+    environment:
+      - ARTIFACTS_DIR=/app/artifacts
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - GITHUB_PUBLISH_TOKEN=${GITHUB_PUBLISH_TOKEN:-}
+      - PUBLISH_REPO=${PUBLISH_REPO:-caojiajun777/ai-daily-agent}
+      - PUBLISH_ISSUE_LABELS=${PUBLISH_ISSUE_LABELS:-ai-daily,agent-generated}
+      - X_BEARER_TOKEN=${X_BEARER_TOKEN:-}
+      - X_AUTH_TOKEN=${X_AUTH_TOKEN:-}
+      - X_CT0=${X_CT0:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - EMAIL_SUBSCRIBERS=${EMAIL_SUBSCRIBERS:-}
+      - X_TWID=${X_TWID:-}
+      - X_GUEST_ID=${X_GUEST_ID:-}
+      - X_KDT=${X_KDT:-}
+    restart: unless-stopped
