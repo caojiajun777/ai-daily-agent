@@ -1,0 +1,17 @@
+name: "📬 订阅 AI 日报"
+description: "在此 Issue 下评论你的邮箱地址即可订阅每日 AI 日报 PDF"
+title: "📬 订阅 AI 日报 — 在此评论邮箱即可"
+labels: ["subscribe"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 如何订阅
+
+        1. 在此 Issue 下方 **评论**
+        2. 评论内容只需写你的 **邮箱地址**
+        3. 每天中午 12:00 会自动发送 PDF 到你的邮箱
+
+        ---
+
+        **也可以直接编辑仓库里的 [subscribers.txt](https://github.com/caojiajun777/ai-daily-agent/edit/main/subscribers.txt) 文件**，一行一个邮箱，提交即可。
