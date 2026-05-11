@@ -1,0 +1,17 @@
+base_url = "https://imjuya.github.io/juya-ai-daily/"
+generate_feeds = true
+feed_filenames = ["rss.xml"]
+theme = "even"
+taxonomies = [
+    {name = "categories", feed = true},
+    {name = "tags", feed = true},
+]
+[extra]
+even_title = "橘鸦AI早报"
+even_menu = [
+    {url = "https://imjuya.github.io/juya-ai-daily", name = "Home"},
+    {url = "https://imjuya.github.io/juya-ai-daily/tags/top/", name = "Top"},
+]
+[markdown]
+highlight_code = true
+render_emoji = true
