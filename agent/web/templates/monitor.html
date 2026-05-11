@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}AI 日报 — 系统监控{% endblock %}
+{% block content %}
+
+<div class="hero">
+  <h1>系统监控</h1>
+  <p>信源健康 + 流水线状态 + 告警</p>
+</div>
+
+{% if alerts %}
+<div class="card" style="border-left:3px solid var(--red)">
+  <h2>⚠ 告警 ({{ alerts|length }})</h2>
+  {% for a in alerts %}
+  <div style="padding:4px 0;font-size:14px">{{ a }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-value">{{ summary.total_sources }}</div>
+    <div class="stat-label">总信源</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value stat-green">{{ summary.ok_sources }}</div>
+    <div class="stat-label">正常</div>
+  </div>
+  {% if summary.stale_sources > 0 %}
+  <div class="stat-card">
+    <div class="stat-value" style="color:var(--orange)">{{ summary.stale_sources }}</div>
+    <div class="stat-label">延迟</div>
+  </div>
+  {% endif %}
+  {% if summary.dead_sources > 0 %}
+  <div class="stat-card">
+    <div class="stat-value stat-red">{{ summary.dead_sources }}</div>
+    <div class="stat-label">失效</div>
+  </div>
+  {% endif %}
+  <div class="stat-card">
+    <div class="stat-value">{{ summary.recent_pipeline_ok }}/{{ summary.recent_pipeline_total }}</div>
+    <div class="stat-label">近两周成功率</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">${{ summary.total_cost_est }}</div>
+    <div class="stat-label">累计成本</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>信源健康</h2>
+  <table style="width:100%;font-size:13px;border-collapse:collapse">
+    <tr style="border-bottom:1px solid var(--border);text-align:left">
+      <th style="padding:8px">ID</th><th>类型</th><th>状态</th><th>上次更新</th><th>说明</th>
+    </tr>
+    {% for s in sources %}
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px">{{ s.source_id[:35] }}</td>
+      <td>{{ s.source_type }}</td>
+      <td>
+        {% if s.status == 'ok' %}<span class="report-status status-ok">正常</span>
+        {% elif s.status == 'stale' %}<span class="report-status status-review">延迟</span>
+        {% elif s.status == 'dead' %}<span class="report-status status-fail">失效</span>
+        {% else %}<span style="color:var(--muted)">{{ s.status }}</span>
+        {% endif %}
+      </td>
+      <td style="font-size:12px">{{ s.last_seen[:10] if s.last_seen else '-' }}</td>
+      <td style="font-size:12px;color:var(--muted)">{{ s.note[:60] }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h2>流水线历史 (最近 14 天)</h2>
+  <table style="width:100%;font-size:13px;border-collapse:collapse">
+    <tr style="border-bottom:1px solid var(--border);text-align:left">
+      <th style="padding:8px">日期</th><th>状态</th><th>条目</th><th>LLM 调用</th><th>Token</th><th>成本</th><th>耗时</th>
+    </tr>
+    {% for p in pipelines[:14] %}
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px">{{ p.date }}</td>
+      <td>
+        {% if p.status == 'ok' %}<span class="report-status status-ok">正常</span>
+        {% elif p.status == 'failed' %}<span class="report-status status-fail">失败</span>
+        {% else %}<span class="report-status status-review">需审核</span>
+        {% endif %}
+      </td>
+      <td>{{ p.draft_items }}</td>
+      <td>{{ p.llm_calls }}</td>
+      <td>{{ p.tokens_in + p.tokens_out }}</td>
+      <td>${{ "%.4f" % p.cost_est }}</td>
+      <td>{{ p.duration_s|int }}s</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+{% endblock %}
