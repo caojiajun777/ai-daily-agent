@@ -1,0 +1,131 @@
+{"ts": 1778322562.84534, "run_id": "2026-05-09-49af7eff", "event": "run_start", "date": "2026-05-09", "provider": "mock", "model": "deepseek-v4-pro"}
+{"ts": 1778322562.8455937, "run_id": "2026-05-09-49af7eff", "event": "stage", "stage": "collect", "status": "running"}
+{"ts": 1778322564.2795424, "run_id": "2026-05-09-49af7eff", "event": "tool_call", "name": "source.rss", "args_summary": "id=huggingface_blog url=https://huggingface.co/blog/feed.xml", "status": "ok", "latency_ms": 1433, "error": null, "stage": "collect"}
+{"ts": 1778322565.78406, "run_id": "2026-05-09-49af7eff", "event": "tool_call", "name": "source.rss", "args_summary": "id=openai_news url=https://openai.com/news/rss.xml", "status": "ok", "latency_ms": 1504, "error": null, "stage": "collect"}
+{"ts": 1778322569.30247, "run_id": "2026-05-09-49af7eff", "event": "tool_call", "name": "source.rss", "args_summary": "id=anthropic_news url=https://www.anthropic.com/news/rss.xml", "status": "ok", "latency_ms": 3517, "error": null, "stage": "collect"}
+{"ts": 1778322569.3028228, "run_id": "2026-05-09-49af7eff", "event": "stage", "stage": "collect", "status": "ok", "count": 30}
+{"ts": 1778322569.3030155, "run_id": "2026-05-09-49af7eff", "event": "stage", "stage": "curate", "status": "running"}
+{"ts": 1778322569.3034146, "run_id": "2026-05-09-49af7eff", "event": "stage", "stage": "curate", "status": "ok", "count": 12}
+{"ts": 1778322569.3036513, "run_id": "2026-05-09-49af7eff", "event": "stage", "stage": "write", "status": "running"}
+{"ts": 1778322569.304297, "run_id": "2026-05-09-49af7eff", "event": "llm_call", "provider": "mock", "model": "deepseek-v4-pro", "prompt_hash": "34c4f0ddd914016b", "input_tokens_est": 1279, "output_tokens_est": 83, "latency_ms": 0, "status": "ok", "error": null, "attempt": 1, "stage": "write"}
+{"ts": 1778322569.3046274, "run_id": "2026-05-09-49af7eff", "event": "stage", "stage": "write", "status": "ok"}
+{"ts": 1778322569.3048089, "run_id": "2026-05-09-49af7eff", "event": "draft_date_overridden", "llm_value": "1970-01-01", "run_value": "2026-05-09"}
+{"ts": 1778322569.3049846, "run_id": "2026-05-09-49af7eff", "event": "stage", "stage": "critique", "status": "running"}
+{"ts": 1778322569.3052068, "run_id": "2026-05-09-49af7eff", "event": "stage", "stage": "critique", "status": "needs_human_review", "reasons": ["sections fewer than 3 (got 1)", "items fewer than 3 (got 1)", "hallucinated url: https://example.com"]}
+{"ts": 1778322569.305362, "run_id": "2026-05-09-49af7eff", "event": "stage", "stage": "publish", "status": "running"}
+{"ts": 1778322569.3063688, "run_id": "2026-05-09-49af7eff", "event": "stage", "stage": "publish", "status": "ok", "path": "artifacts\\drafts\\2026-05-09.md"}
+{"ts": 1778322569.3065515, "run_id": "2026-05-09-49af7eff", "event": "stage", "stage": "eval", "status": "running"}
+{"ts": 1778322569.3074224, "run_id": "2026-05-09-49af7eff", "event": "stage", "stage": "eval", "status": "needs_human_review", "section_count": 1, "item_count": 1, "unique_titles_ratio": 1.0, "hallucinated_urls": 1, "forbidden_hits": 0, "issues": ["section_count_below_threshold", "hallucinated_urls_present"], "ok": false}
+{"ts": 1778322569.3081715, "run_id": "2026-05-09-49af7eff", "event": "run_end", "report_path": "artifacts\\reports\\2026-05-09.json"}
+{"ts": 1778323506.6469495, "run_id": "publish-2026-05-09", "event": "publish_gate", "date": "2026-05-09", "ok": false, "blocked_reasons": ["draft has 1 items, below minimum_items=3", "critic did not pass (verdict='reject', status='needs_human_review')", "critic: sections fewer than 3 (got 1)", "critic: items fewer than 3 (got 1)", "critic: hallucinated url: https://example.com", "eval has 2 issues (>0): ['section_count_below_threshold', 'hallucinated_urls_present']"], "target_repo": "imjuya/juya-ai-daily", "mode": "dry-run", "force": false}
+{"ts": 1778323506.647868, "run_id": "publish-2026-05-09", "event": "publish_preview_written", "preview_path": "artifacts\\reports\\publish_preview_2026-05-09.json", "would_publish": false}
+{"ts": 1778327588.9192073, "run_id": "2026-05-09-3b0bd00a", "event": "run_start", "date": "2026-05-09", "provider": "mock", "model": "deepseek-v4-pro"}
+{"ts": 1778327588.9194858, "run_id": "2026-05-09-3b0bd00a", "event": "stage", "stage": "collect", "status": "running"}
+{"ts": 1778327590.3203447, "run_id": "2026-05-09-3b0bd00a", "event": "tool_call", "name": "source.rss", "args_summary": "id=huggingface_blog url=https://huggingface.co/blog/feed.xml", "status": "ok", "latency_ms": 1400, "error": null, "stage": "collect"}
+{"ts": 1778327591.7321823, "run_id": "2026-05-09-3b0bd00a", "event": "tool_call", "name": "source.rss", "args_summary": "id=openai_news url=https://openai.com/news/rss.xml", "status": "ok", "latency_ms": 1411, "error": null, "stage": "collect"}
+{"ts": 1778327594.6625695, "run_id": "2026-05-09-3b0bd00a", "event": "tool_call", "name": "source.rss", "args_summary": "id=anthropic_news url=https://www.anthropic.com/news/rss.xml", "status": "ok", "latency_ms": 2929, "error": null, "stage": "collect"}
+{"ts": 1778327594.662936, "run_id": "2026-05-09-3b0bd00a", "event": "stage", "stage": "collect", "status": "ok", "count": 30}
+{"ts": 1778327594.6631277, "run_id": "2026-05-09-3b0bd00a", "event": "stage", "stage": "curate", "status": "running"}
+{"ts": 1778327594.6635187, "run_id": "2026-05-09-3b0bd00a", "event": "stage", "stage": "curate", "status": "ok", "count": 12}
+{"ts": 1778327594.6637003, "run_id": "2026-05-09-3b0bd00a", "event": "stage", "stage": "write", "status": "running"}
+{"ts": 1778327594.664264, "run_id": "2026-05-09-3b0bd00a", "event": "llm_call", "provider": "mock", "model": "deepseek-v4-pro", "prompt_hash": "7878aba2e1a535a5", "input_tokens_est": 1487, "output_tokens_est": 251, "latency_ms": 0, "status": "ok", "error": null, "attempt": 1, "stage": "write"}
+{"ts": 1778327594.664585, "run_id": "2026-05-09-3b0bd00a", "event": "stage", "stage": "write", "status": "ok"}
+{"ts": 1778327594.6647735, "run_id": "2026-05-09-3b0bd00a", "event": "draft_date_overridden", "llm_value": "1970-01-01", "run_value": "2026-05-09"}
+{"ts": 1778327594.664949, "run_id": "2026-05-09-3b0bd00a", "event": "stage", "stage": "critique", "status": "running"}
+{"ts": 1778327594.6692786, "run_id": "2026-05-09-3b0bd00a", "event": "stage", "stage": "critique", "status": "needs_human_review", "reasons": ["hallucinated url: https://example.com/a", "hallucinated url: https://example.com/b", "hallucinated url: https://example.com/c", "hallucinated url: https://example.com/d", "hallucinated url: https://example.com/e", "hallucinated url: https://example.com/f"]}
+{"ts": 1778327594.6695197, "run_id": "2026-05-09-3b0bd00a", "event": "stage", "stage": "publish", "status": "running"}
+{"ts": 1778327594.67037, "run_id": "2026-05-09-3b0bd00a", "event": "stage", "stage": "publish", "status": "ok", "path": "artifacts\\drafts\\2026-05-09.md"}
+{"ts": 1778327594.6705449, "run_id": "2026-05-09-3b0bd00a", "event": "stage", "stage": "eval", "status": "running"}
+{"ts": 1778327594.6714303, "run_id": "2026-05-09-3b0bd00a", "event": "stage", "stage": "eval", "status": "needs_human_review", "section_count": 6, "item_count": 6, "unique_titles_ratio": 1.0, "hallucinated_urls": 6, "forbidden_hits": 0, "issues": ["hallucinated_urls_present"], "ok": false}
+{"ts": 1778327594.6721034, "run_id": "2026-05-09-3b0bd00a", "event": "run_end", "report_path": "artifacts\\reports\\2026-05-09.json"}
+{"ts": 1778327725.266219, "run_id": "2026-05-09-5d6f798b", "event": "run_start", "date": "2026-05-09", "provider": "mock", "model": "deepseek-v4-pro"}
+{"ts": 1778327725.2665024, "run_id": "2026-05-09-5d6f798b", "event": "stage", "stage": "collect", "status": "running"}
+{"ts": 1778327727.0184836, "run_id": "2026-05-09-5d6f798b", "event": "tool_call", "name": "source.rss", "args_summary": "id=huggingface_blog url=https://huggingface.co/blog/feed.xml", "status": "ok", "latency_ms": 1751, "error": null, "stage": "collect"}
+{"ts": 1778327728.9482834, "run_id": "2026-05-09-5d6f798b", "event": "tool_call", "name": "source.rss", "args_summary": "id=openai_news url=https://openai.com/news/rss.xml", "status": "ok", "latency_ms": 1929, "error": null, "stage": "collect"}
+{"ts": 1778327732.8779624, "run_id": "2026-05-09-5d6f798b", "event": "tool_call", "name": "source.rss", "args_summary": "id=anthropic_news url=https://www.anthropic.com/news/rss.xml", "status": "ok", "latency_ms": 3929, "error": null, "stage": "collect"}
+{"ts": 1778327732.8783488, "run_id": "2026-05-09-5d6f798b", "event": "stage", "stage": "collect", "status": "ok", "count": 30}
+{"ts": 1778327732.8785403, "run_id": "2026-05-09-5d6f798b", "event": "stage", "stage": "curate", "status": "running"}
+{"ts": 1778327732.878934, "run_id": "2026-05-09-5d6f798b", "event": "stage", "stage": "curate", "status": "ok", "count": 12}
+{"ts": 1778327732.8791184, "run_id": "2026-05-09-5d6f798b", "event": "stage", "stage": "write", "status": "running"}
+{"ts": 1778327732.8798072, "run_id": "2026-05-09-5d6f798b", "event": "llm_call", "provider": "mock", "model": "deepseek-v4-pro", "prompt_hash": "3506911f06b242a6", "input_tokens_est": 1488, "output_tokens_est": 345, "latency_ms": 0, "status": "ok", "error": null, "attempt": 1, "stage": "write"}
+{"ts": 1778327732.8801115, "run_id": "2026-05-09-5d6f798b", "event": "stage", "stage": "write", "status": "ok"}
+{"ts": 1778327732.880288, "run_id": "2026-05-09-5d6f798b", "event": "draft_date_overridden", "llm_value": "1970-01-01", "run_value": "2026-05-09"}
+{"ts": 1778327732.8805168, "run_id": "2026-05-09-5d6f798b", "event": "stage", "stage": "critique", "status": "running"}
+{"ts": 1778327732.8808057, "run_id": "2026-05-09-5d6f798b", "event": "stage", "stage": "critique", "status": "ok", "score": 100}
+{"ts": 1778327732.880979, "run_id": "2026-05-09-5d6f798b", "event": "stage", "stage": "publish", "status": "running"}
+{"ts": 1778327732.882286, "run_id": "2026-05-09-5d6f798b", "event": "stage", "stage": "publish", "status": "ok", "path": "artifacts\\drafts\\2026-05-09.md"}
+{"ts": 1778327732.8825114, "run_id": "2026-05-09-5d6f798b", "event": "stage", "stage": "eval", "status": "running"}
+{"ts": 1778327732.883348, "run_id": "2026-05-09-5d6f798b", "event": "stage", "stage": "eval", "status": "ok", "section_count": 6, "item_count": 6, "unique_titles_ratio": 1.0, "hallucinated_urls": 0, "forbidden_hits": 0, "issues": [], "ok": true}
+{"ts": 1778327732.8839974, "run_id": "2026-05-09-5d6f798b", "event": "run_end", "report_path": "artifacts\\reports\\2026-05-09.json"}
+{"ts": 1778328922.1194475, "run_id": "2026-05-09-52581b7f", "event": "run_start", "date": "2026-05-09", "provider": "deepseek", "model": "deepseek-v4-pro"}
+{"ts": 1778328922.119729, "run_id": "2026-05-09-52581b7f", "event": "stage", "stage": "collect", "status": "running"}
+{"ts": 1778328926.059087, "run_id": "2026-05-09-52581b7f", "event": "tool_call", "name": "source.rss", "args_summary": "id=huggingface_blog url=https://huggingface.co/blog/feed.xml", "status": "ok", "latency_ms": 3939, "error": null, "stage": "collect"}
+{"ts": 1778328929.3209984, "run_id": "2026-05-09-52581b7f", "event": "tool_call", "name": "source.rss", "args_summary": "id=openai_news url=https://openai.com/news/rss.xml", "status": "ok", "latency_ms": 3261, "error": null, "stage": "collect"}
+{"ts": 1778328933.7484221, "run_id": "2026-05-09-52581b7f", "event": "tool_call", "name": "source.rss", "args_summary": "id=anthropic_news url=https://www.anthropic.com/news/rss.xml", "status": "ok", "latency_ms": 4427, "error": null, "stage": "collect"}
+{"ts": 1778328933.748822, "run_id": "2026-05-09-52581b7f", "event": "stage", "stage": "collect", "status": "ok", "count": 30}
+{"ts": 1778328933.7491612, "run_id": "2026-05-09-52581b7f", "event": "stage", "stage": "curate", "status": "running"}
+{"ts": 1778328933.7496195, "run_id": "2026-05-09-52581b7f", "event": "stage", "stage": "curate", "status": "ok", "count": 12}
+{"ts": 1778328933.7498167, "run_id": "2026-05-09-52581b7f", "event": "stage", "stage": "write", "status": "running"}
+{"ts": 1778329007.9598727, "run_id": "2026-05-09-52581b7f", "event": "llm_call", "provider": "deepseek", "model": "deepseek-v4-pro", "prompt_hash": "15ec356342ae661d", "input_tokens_est": 1487, "output_tokens_est": 0, "latency_ms": 74209, "status": "ok", "error": null, "attempt": 1, "stage": "write"}
+{"ts": 1778329007.9604616, "run_id": "2026-05-09-52581b7f", "event": "stage", "stage": "write", "status": "needs_human_review", "error": "no JSON object found in model output"}
+{"ts": 1778329007.9611313, "run_id": "2026-05-09-52581b7f", "event": "run_end", "report_path": "artifacts\\reports\\2026-05-09.json"}
+{"ts": 1778329217.6484404, "run_id": "2026-05-09-23234f17", "event": "run_start", "date": "2026-05-09", "provider": "deepseek", "model": "deepseek-v4-pro"}
+{"ts": 1778329217.6488156, "run_id": "2026-05-09-23234f17", "event": "stage", "stage": "collect", "status": "running"}
+{"ts": 1778329219.7973003, "run_id": "2026-05-09-23234f17", "event": "tool_call", "name": "source.rss", "args_summary": "id=huggingface_blog url=https://huggingface.co/blog/feed.xml", "status": "ok", "latency_ms": 2148, "error": null, "stage": "collect"}
+{"ts": 1778329221.1503606, "run_id": "2026-05-09-23234f17", "event": "tool_call", "name": "source.rss", "args_summary": "id=openai_news url=https://openai.com/news/rss.xml", "status": "ok", "latency_ms": 1352, "error": null, "stage": "collect"}
+{"ts": 1778329227.4725068, "run_id": "2026-05-09-23234f17", "event": "tool_call", "name": "source.rss", "args_summary": "id=anthropic_news url=https://www.anthropic.com/news/rss.xml", "status": "ok", "latency_ms": 6321, "error": null, "stage": "collect"}
+{"ts": 1778329227.4728775, "run_id": "2026-05-09-23234f17", "event": "stage", "stage": "collect", "status": "ok", "count": 30}
+{"ts": 1778329227.4730766, "run_id": "2026-05-09-23234f17", "event": "stage", "stage": "curate", "status": "running"}
+{"ts": 1778329227.473585, "run_id": "2026-05-09-23234f17", "event": "stage", "stage": "curate", "status": "ok", "count": 12}
+{"ts": 1778329227.4738026, "run_id": "2026-05-09-23234f17", "event": "stage", "stage": "write", "status": "running"}
+{"ts": 1778329361.1237981, "run_id": "2026-05-09-23234f17", "event": "llm_call", "provider": "deepseek", "model": "deepseek-v4-pro", "prompt_hash": "6d3d3f34c0b74927", "input_tokens_est": 1488, "output_tokens_est": 0, "latency_ms": 133649, "status": "ok", "error": null, "attempt": 1, "stage": "write"}
+{"ts": 1778329361.1243854, "run_id": "2026-05-09-23234f17", "event": "stage", "stage": "write", "status": "needs_human_review", "error": "no JSON object found in model output"}
+{"ts": 1778329361.1251357, "run_id": "2026-05-09-23234f17", "event": "run_end", "report_path": "artifacts\\reports\\2026-05-09.json"}
+{"ts": 1778329756.0582008, "run_id": "2026-05-09-0cd417d5", "event": "run_start", "date": "2026-05-09", "provider": "deepseek", "model": "deepseek-v4-pro"}
+{"ts": 1778329756.0584958, "run_id": "2026-05-09-0cd417d5", "event": "stage", "stage": "collect", "status": "running"}
+{"ts": 1778329758.6272411, "run_id": "2026-05-09-0cd417d5", "event": "tool_call", "name": "source.rss", "args_summary": "id=huggingface_blog url=https://huggingface.co/blog/feed.xml", "status": "ok", "latency_ms": 2568, "error": null, "stage": "collect"}
+{"ts": 1778329761.662519, "run_id": "2026-05-09-0cd417d5", "event": "tool_call", "name": "source.rss", "args_summary": "id=openai_news url=https://openai.com/news/rss.xml", "status": "ok", "latency_ms": 3034, "error": null, "stage": "collect"}
+{"ts": 1778329765.189153, "run_id": "2026-05-09-0cd417d5", "event": "tool_call", "name": "source.rss", "args_summary": "id=anthropic_news url=https://www.anthropic.com/news/rss.xml", "status": "ok", "latency_ms": 3526, "error": null, "stage": "collect"}
+{"ts": 1778329765.1896274, "run_id": "2026-05-09-0cd417d5", "event": "stage", "stage": "collect", "status": "ok", "count": 30}
+{"ts": 1778329765.189899, "run_id": "2026-05-09-0cd417d5", "event": "stage", "stage": "curate", "status": "running"}
+{"ts": 1778329765.19031, "run_id": "2026-05-09-0cd417d5", "event": "stage", "stage": "curate", "status": "ok", "count": 12}
+{"ts": 1778329765.1904874, "run_id": "2026-05-09-0cd417d5", "event": "stage", "stage": "write", "status": "running"}
+{"ts": 1778329958.197054, "run_id": "2026-05-09-0cd417d5", "event": "llm_call", "provider": "deepseek", "model": "deepseek-v4-pro", "prompt_hash": "29d79d8d24421e89", "input_tokens_est": 1487, "output_tokens_est": 1282, "latency_ms": 193005, "status": "ok", "error": null, "attempt": 1, "stage": "write"}
+{"ts": 1778329958.1977308, "run_id": "2026-05-09-0cd417d5", "event": "stage", "stage": "write", "status": "ok"}
+{"ts": 1778329958.1979423, "run_id": "2026-05-09-0cd417d5", "event": "stage", "stage": "critique", "status": "running"}
+{"ts": 1778329958.1981642, "run_id": "2026-05-09-0cd417d5", "event": "stage", "stage": "critique", "status": "ok", "score": 100}
+{"ts": 1778329958.1983333, "run_id": "2026-05-09-0cd417d5", "event": "stage", "stage": "publish", "status": "running"}
+{"ts": 1778329958.1992853, "run_id": "2026-05-09-0cd417d5", "event": "stage", "stage": "publish", "status": "ok", "path": "artifacts\\drafts\\2026-05-09.md"}
+{"ts": 1778329958.1995072, "run_id": "2026-05-09-0cd417d5", "event": "stage", "stage": "eval", "status": "running"}
+{"ts": 1778329958.2004557, "run_id": "2026-05-09-0cd417d5", "event": "stage", "stage": "eval", "status": "ok", "section_count": 6, "item_count": 13, "unique_titles_ratio": 1.0, "hallucinated_urls": 0, "forbidden_hits": 0, "issues": [], "ok": true}
+{"ts": 1778329958.2010527, "run_id": "2026-05-09-0cd417d5", "event": "run_end", "report_path": "artifacts\\reports\\2026-05-09.json"}
+{"ts": 1778329979.5041554, "run_id": "publish-2026-05-09", "event": "publish_gate", "date": "2026-05-09", "ok": true, "blocked_reasons": [], "target_repo": "local/ai-daily-agent", "mode": "dry-run", "force": false}
+{"ts": 1778329979.5049033, "run_id": "publish-2026-05-09", "event": "publish_preview_written", "preview_path": "artifacts\\reports\\publish_preview_2026-05-09.json", "would_publish": true}
+{"ts": 1778334998.7186527, "run_id": "2026-05-09-2f09691b", "event": "run_start", "date": "2026-05-09", "provider": "deepseek", "model": "deepseek-v4-pro"}
+{"ts": 1778334998.7189167, "run_id": "2026-05-09-2f09691b", "event": "stage", "stage": "collect", "status": "running"}
+{"ts": 1778335001.0932612, "run_id": "2026-05-09-2f09691b", "event": "tool_call", "name": "source.rss", "args_summary": "id=huggingface_blog url=https://huggingface.co/blog/feed.xml", "status": "ok", "latency_ms": 2374, "error": null, "stage": "collect"}
+{"ts": 1778335003.968746, "run_id": "2026-05-09-2f09691b", "event": "tool_call", "name": "source.rss", "args_summary": "id=openai_news url=https://openai.com/news/rss.xml", "status": "ok", "latency_ms": 2875, "error": null, "stage": "collect"}
+{"ts": 1778335009.043654, "run_id": "2026-05-09-2f09691b", "event": "tool_call", "name": "source.rss", "args_summary": "id=anthropic_news url=https://www.anthropic.com/news/rss.xml", "status": "ok", "latency_ms": 5074, "error": null, "stage": "collect"}
+{"ts": 1778335009.0440612, "run_id": "2026-05-09-2f09691b", "event": "stage", "stage": "collect", "status": "ok", "count": 30}
+{"ts": 1778335009.044252, "run_id": "2026-05-09-2f09691b", "event": "stage", "stage": "curate", "status": "running"}
+{"ts": 1778335009.0447905, "run_id": "2026-05-09-2f09691b", "event": "stage", "stage": "curate", "status": "ok", "count": 12}
+{"ts": 1778335009.044987, "run_id": "2026-05-09-2f09691b", "event": "stage", "stage": "write", "status": "running"}
+{"ts": 1778335256.289811, "run_id": "2026-05-09-2f09691b", "event": "llm_call", "provider": "deepseek", "model": "deepseek-v4-pro", "prompt_hash": "70a40ffc59cddfc8", "input_tokens_est": 1487, "output_tokens_est": 1189, "latency_ms": 247244, "status": "ok", "error": null, "attempt": 1, "stage": "write"}
+{"ts": 1778335256.2904568, "run_id": "2026-05-09-2f09691b", "event": "stage", "stage": "write", "status": "ok"}
+{"ts": 1778335256.2913015, "run_id": "2026-05-09-2f09691b", "event": "curated_artifact_written", "path": "artifacts\\curated\\2026-05-09.json", "item_count": 12}
+{"ts": 1778335256.2915204, "run_id": "2026-05-09-2f09691b", "event": "stage", "stage": "critique", "status": "running"}
+{"ts": 1778335256.2917402, "run_id": "2026-05-09-2f09691b", "event": "stage", "stage": "critique", "status": "ok", "score": 100}
+{"ts": 1778335256.2919462, "run_id": "2026-05-09-2f09691b", "event": "stage", "stage": "publish", "status": "running"}
+{"ts": 1778335256.2928662, "run_id": "2026-05-09-2f09691b", "event": "stage", "stage": "publish", "status": "ok", "path": "artifacts\\drafts\\2026-05-09.md"}
+{"ts": 1778335256.2930532, "run_id": "2026-05-09-2f09691b", "event": "stage", "stage": "eval", "status": "running"}
+{"ts": 1778335256.2939985, "run_id": "2026-05-09-2f09691b", "event": "stage", "stage": "eval", "status": "ok", "section_count": 6, "item_count": 12, "unique_titles_ratio": 1.0, "hallucinated_urls": 0, "forbidden_hits": 0, "issues": [], "ok": true, "used_curated_artifact": true}
+{"ts": 1778335264.1050453, "run_id": "2026-05-09-2f09691b", "event": "llm_call", "provider": "deepseek", "model": "deepseek-v4-pro", "prompt_hash": "a885c369f3ca4024", "input_tokens_est": 1141, "output_tokens_est": 4, "latency_ms": 7810, "status": "ok", "error": null, "attempt": 1, "stage": "semantic_dup"}
+{"ts": 1778335264.105459, "run_id": "2026-05-09-2f09691b", "event": "semantic_dup_checked", "date": "2026-05-09", "ok": true, "duplicate_count": 0, "checked": 12}
+{"ts": 1778335264.1060188, "run_id": "2026-05-09-2f09691b", "event": "semantic_dup_report_written", "path": "artifacts\\reports\\semantic_duplicates_2026-05-09.json", "ok": true, "duplicate_count": 0}
+{"ts": 1778335264.1071908, "run_id": "2026-05-09-2f09691b", "event": "run_end", "report_path": "artifacts\\reports\\2026-05-09.json"}
+{"ts": 1778341803.0013392, "run_id": "publish-2026-05-09", "event": "publish_gate", "date": "2026-05-09", "ok": true, "blocked_reasons": [], "target_repo": "caojiajun777/ai-daily-agent", "mode": "dry-run", "force": false}
+{"ts": 1778341804.6056025, "run_id": "publish-2026-05-09", "event": "publish_preview_written", "preview_path": "artifacts\\reports\\publish_preview_2026-05-09.json", "would_publish": true}
+{"ts": 1778342212.4075084, "run_id": "publish-2026-05-09", "event": "publish_gate", "date": "2026-05-09", "ok": true, "blocked_reasons": [], "target_repo": "caojiajun777/ai-daily-agent", "mode": "confirm", "force": false}
+{"ts": 1778342215.8649464, "run_id": "publish-2026-05-09", "event": "publish_failed", "error": "create_issue failed: 403 {\"message\":\"Resource not accessible by personal access token\",\"documentation_url\":\"https://docs.github.com/rest/issues/issues#create-an-issue\",\"status\":\"403\"}", "result_path": "artifacts\\reports\\publish_result_2026-05-09.json"}
+{"ts": 1778342682.3323514, "run_id": "publish-2026-05-09", "event": "publish_gate", "date": "2026-05-09", "ok": true, "blocked_reasons": [], "target_repo": "caojiajun777/ai-daily-agent", "mode": "confirm", "force": false}
+{"ts": 1778342686.1366048, "run_id": "publish-2026-05-09", "event": "publish_succeeded", "issue_number": 1, "issue_url": "https://github.com/caojiajun777/ai-daily-agent/issues/1", "forced": false, "result_path": "artifacts\\reports\\publish_result_2026-05-09.json"}
