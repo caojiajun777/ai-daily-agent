@@ -1,0 +1,223 @@
+name: Auto Subscribe — validate & add subscriber
+
+# When someone comments on the subscribe Issue, validate their email
+# and auto-add to the subscriber list. Fully automated, no manual steps.
+#
+# Security: validates email format, blocks disposable domains, checks
+# for injection patterns before adding.
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  subscribe:
+    name: Validate & subscribe
+    # Only run on the subscribe-labeled Issue.
+    if: >
+      contains(github.event.issue.labels.*.name, 'subscribe') &&
+      github.event.issue.state == 'open' &&
+      github.event.comment.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_PUBLISH_TOKEN: ${{ secrets.GITHUB_PUBLISH_TOKEN }}
+      PUBLISH_REPO: ${{ secrets.PUBLISH_REPO }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install pynacl httpx
+
+      - name: Validate & subscribe
+        id: sub
+        run: |
+          python << 'PYEOF'
+          import os, re, json, hashlib, httpx
+
+          comment_body = r'''${{ github.event.comment.body }}'''
+          comment_user = "${{ github.event.comment.user.login }}"
+          issue_number = ${{ github.event.issue.number }}
+          repo = os.getenv("PUBLISH_REPO", "${{ github.repository }}")
+          token = os.getenv("GITHUB_PUBLISH_TOKEN") or os.getenv("GITHUB_TOKEN", "")
+
+          # ── Step 1: Extract email ──────────────────────────────
+          emails = re.findall(
+              r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
+              comment_body,
+          )
+          if not emails:
+              print("No email found in comment — skipping")
+              exit(0)
+
+          email = emails[0].lower()
+
+          # ── Check for unsubscribe ──────────────────────────────
+          is_unsub = any(w in comment_body for w in ["退订", "退閱", "取消订阅", "unsubscribe"])
+
+          if is_unsub:
+              existing = _get_existing_subscribers(client, repo, token)
+              email_lower = email.lower()
+              new_list = [e for e in existing if e.lower() != email_lower]
+              if len(new_list) == len(existing):
+                  _reply(repo, issue_number, token, comment_user,
+                         f"ℹ️ `{email}` 不在订阅列表中。")
+                  exit(0)
+              _update_secret(client, repo, token, "EMAIL_SUBSCRIBERS", ",".join(new_list))
+              _reply(repo, issue_number, token, comment_user,
+                     f"👋 `{email}` 已退订。希望以后再见！")
+              print(f"Unsubscribed: {email}")
+              exit(0)
+
+          # ── Step 2: Validate ──────────────────────────────────
+
+          # 2a. Basic format.
+          if not re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", email):
+              _reply(repo, issue_number, token, comment_user,
+                     f"❌ `{email}` 格式不正确，请检查后重新评论。")
+              exit(1)
+
+          # 2b. Block injection / XSS / SQL patterns.
+          dangerous = ["<script", "javascript:", "onerror=", "onload=",
+                       "union select", "drop table", "1=1", "../", "<img",
+                       "\\x", "%0d", "%0a", "\r", "\n"]
+          for d in dangerous:
+              if d in comment_body.lower():
+                  _reply(repo, issue_number, token, comment_user,
+                         f"⚠️ 检测到可疑内容，评论已被忽略。如有疑问请联系管理员。")
+                  exit(1)
+
+          # 2c. Block disposable email domains.
+          disposable = {
+              "mailinator.com", "guerrillamail.com", "10minutemail.com",
+              "tempmail.com", "throwaway.email", "sharklasers.com",
+              "yopmail.com", "trashmail.com", "fakeinbox.com",
+              "temp-mail.org", "dispostable.com", "maildrop.cc",
+              "getnada.com", "moakt.cc", "disposablemail.com",
+              "33mail.com", "0wnd.net", "0wnd.org", "spam4.me",
+              "spamgourmet.com", "mailnesia.com", "mintemail.com",
+              "guerrillamail.org", "guerrillamail.net", "guerrillamail.biz",
+              "mailcatch.com", "mytrashmail.com", "tempemail.net",
+              "wegwerfmail.de", "wegwerfmail.net", "wegwerfmail.org",
+              "trash-mail.com", "trashmail.net", "trashmail.org",
+          }
+          domain = email.split("@")[1]
+          if domain in disposable:
+              _reply(repo, issue_number, token, comment_user,
+                     f"⚠️ `{domain}` 是一次性邮箱，不支持订阅。请使用常规邮箱。")
+              exit(1)
+
+          # 2d. Basic domain sanity: must have a dot in the TLD part.
+          if "." not in domain or domain.endswith("."):
+              _reply(repo, issue_number, token, comment_user,
+                     f"❌ `{email}` 域名无效，请检查。")
+              exit(1)
+
+          # ── Step 3: Add to EMAIL_SUBSCRIBERS secret ───────────
+          client = httpx.Client(
+              base_url=f"https://api.github.com/repos/{repo}",
+              headers={
+                  "Authorization": f"Bearer {token}",
+                  "Accept": "application/vnd.github.v3+json",
+                  "User-Agent": "report-agent-subscribe",
+              },
+              timeout=15.0,
+          )
+
+          # Get current subscribers from secret or env.
+          existing = _get_existing_subscribers(client, repo, token)
+          if email in existing:
+              _reply(repo, issue_number, token, comment_user,
+                     f"ℹ️ `{email}` 已经在订阅列表中，无需重复订阅。")
+              client.close()
+              exit(0)
+
+          existing.append(email)
+          new_list = ",".join(existing)
+
+          # Encrypt and update the secret.
+          try:
+              _update_secret(client, repo, token, "EMAIL_SUBSCRIBERS", new_list)
+              _reply(repo, issue_number, token, comment_user,
+                     f"✅ `{email}` 订阅成功！每天中午 12:00 你将收到 AI 日报 PDF。\n\n"
+                     f"如需退订，请在 [#14](https://github.com/{repo}/issues/14) 下评论你的邮箱并注明「退订」。")
+              print(f"Subscribed: {email}")
+          except Exception as e:
+              _reply(repo, issue_number, token, comment_user,
+                     f"⚠️ 系统错误，请稍后重试。如果问题持续请联系管理员。")
+              print(f"Error updating secret: {e}")
+              client.close()
+              exit(1)
+
+          client.close()
+
+
+          # ── Helpers ────────────────────────────────────────────
+
+          def _reply(repo, issue_number, token, user, body):
+              """Post a reply comment on the Issue."""
+              import httpx as _httpx
+              c = _httpx.Client(
+                  headers={
+                      "Authorization": f"Bearer {token}",
+                      "Accept": "application/vnd.github.v3+json",
+                      "User-Agent": "report-agent-subscribe",
+                  },
+                  timeout=15.0,
+              )
+              c.post(
+                  f"https://api.github.com/repos/{repo}/issues/{issue_number}/comments",
+                  json={"body": f"@{user} {body}"},
+              )
+              c.close()
+
+
+          def _get_existing_subscribers(client, repo, token):
+              """Read current EMAIL_SUBSCRIBERS secret value."""
+              try:
+                  pk_resp = client.get("/actions/secrets/public-key")
+                  pk = pk_resp.json()
+              except Exception:
+                  return []
+              # We can't read the secret value directly, so we check
+              # against a known list maintained in the repo or env.
+              # Fallback: read from subscribers.txt in repo.
+              import urllib.request
+              raw_url = f"https://raw.githubusercontent.com/{repo}/main/subscribers.txt"
+              try:
+                  with urllib.request.urlopen(raw_url, timeout=10) as r:
+                      text = r.read().decode("utf-8")
+                      return [l.strip() for l in text.split("\n")
+                              if l.strip() and not l.strip().startswith("#")
+                              and "@" in l]
+              except Exception:
+                  return ["905562805@qq.com", "1780609071@qq.com"]
+
+
+          def _update_secret(client, repo, token, name, value):
+              """Update a GitHub Actions secret."""
+              import base64
+              pk_resp = client.get("/actions/secrets/public-key")
+              pk = pk_resp.json()
+              from nacl import public
+              pub_key = public.PublicKey(base64.b64decode(pk["key"]))
+              sealed = public.SealedBox(pub_key).encrypt(value.encode())
+              encrypted = base64.b64encode(sealed).decode()
+              resp = client.put(
+                  f"/actions/secrets/{name}",
+                  json={"encrypted_value": encrypted, "key_id": pk["key_id"]},
+              )
+              return resp.status_code in (201, 204)
+
+          PYEOF
