@@ -1,0 +1,119 @@
+{
+  "run_id": "2026-05-10-862c63f1",
+  "date": "2026-05-10",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "started_at": 1778433748.5149946,
+  "ended_at": 1778434380.0233204,
+  "is_failed": false,
+  "needs_human_review": false,
+  "stages": {
+    "collect": {
+      "name": "collect",
+      "status": "ok",
+      "started_at": 1778433748.5158896,
+      "ended_at": 1778433768.179165,
+      "error": null,
+      "artifact_path": null,
+      "meta": {
+        "raw_item_count": 101
+      }
+    },
+    "curate": {
+      "name": "curate",
+      "status": "ok",
+      "started_at": 1778433768.179413,
+      "ended_at": 1778433768.1832552,
+      "error": null,
+      "artifact_path": null,
+      "meta": {
+        "curated_item_count": 20
+      }
+    },
+    "write": {
+      "name": "write",
+      "status": "ok",
+      "started_at": 1778433768.183525,
+      "ended_at": 1778434198.9942374,
+      "error": null,
+      "artifact_path": null,
+      "meta": {}
+    },
+    "critique": {
+      "name": "critique",
+      "status": "ok",
+      "started_at": 1778434353.0753539,
+      "ended_at": 1778434353.0758371,
+      "error": null,
+      "artifact_path": null,
+      "meta": {
+        "verdict": "pass",
+        "reasons": [],
+        "score": 100
+      }
+    },
+    "publish": {
+      "name": "publish",
+      "status": "ok",
+      "started_at": 1778434353.0761967,
+      "ended_at": 1778434353.0775347,
+      "error": null,
+      "artifact_path": "artifacts\\drafts\\2026-05-10.md",
+      "meta": {
+        "json_path": "artifacts\\drafts\\2026-05-10.json"
+      }
+    },
+    "eval": {
+      "name": "eval",
+      "status": "ok",
+      "started_at": 1778434353.0777714,
+      "ended_at": 1778434353.0789485,
+      "error": null,
+      "artifact_path": null,
+      "meta": {
+        "section_count": 6,
+        "item_count": 19,
+        "unique_titles_ratio": 1.0,
+        "hallucinated_urls": 0,
+        "forbidden_hits": 0,
+        "issues": [],
+        "ok": true,
+        "used_curated_artifact": true
+      }
+    }
+  },
+  "budget": {
+    "input_tokens_used": 7164,
+    "output_tokens_used": 4426,
+    "calls_used": 2,
+    "by_stage": {
+      "write": {
+        "calls": 1,
+        "in": 3728,
+        "out": 4422
+      },
+      "semantic_dup": {
+        "calls": 1,
+        "in": 3436,
+        "out": 4
+      }
+    },
+    "limits": {
+      "max_total_input_tokens": 200000,
+      "max_total_output_tokens": 30000,
+      "max_total_calls": 40
+    }
+  },
+  "draft_path": "artifacts\\drafts\\2026-05-10.md",
+  "curated_path": "artifacts\\curated\\2026-05-10.json",
+  "semantic_duplicate_report_path": "artifacts\\reports\\semantic_duplicates_2026-05-10.json",
+  "semantic_duplicate_count": 0,
+  "semantic_duplicate_ok": true,
+  "repair_attempted": false,
+  "repair_succeeded": false,
+  "repair_reason": null,
+  "repair_report_path": null,
+  "draft_version": "v1",
+  "pre_repair_semantic_duplicate_count": null,
+  "post_repair_semantic_duplicate_count": null
+}
