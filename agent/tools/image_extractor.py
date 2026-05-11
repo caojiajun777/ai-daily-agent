@@ -70,6 +70,7 @@ def _get_browser():
                     "args": [
                         "--disable-blink-features=AutomationControlled",
                         "--no-sandbox",
+                        "--disable-gpu",
                     ],
                 }
                 if channel:
