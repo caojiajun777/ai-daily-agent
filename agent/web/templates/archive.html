@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}AI 日报 — 归档{% endblock %}
+{% block content %}
+
+<div class="hero">
+  <h1>归档</h1>
+  <p>{{ reports|length }} 期报告</p>
+</div>
+
+<div class="card">
+  <ul class="report-list">
+  {% for r in reports %}
+    <li>
+      <div>
+        <a href="/report/{{ r.date }}" class="report-date">{{ r.date }}</a>
+        <span class="report-meta"> · {{ r.item_count }} 条 · {{ r.section_count }} 板块</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        {% if r.is_failed %}
+        <span class="report-status status-fail">失败</span>
+        {% elif r.needs_review %}
+        <span class="report-status status-review">需审核</span>
+        {% else %}
+        <span class="report-status status-ok">正常</span>
+        {% endif %}
+      </div>
+    </li>
+  {% endfor %}
+  </ul>
+</div>
+
+{% endblock %}
