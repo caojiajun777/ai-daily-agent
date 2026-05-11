@@ -55,12 +55,23 @@ def _enrich_images_for_draft(draft, tracer, timeout: float = 4.0) -> int:
     Runs after the draft is validated. Failures are per-item and silent.
     """
     from agent.tools.image_extractor import extract_image
+    from urllib.parse import urlparse
+
+    # IT之家 image extraction is too unreliable — skip.
+    _SKIP = {"ithome.com", "x.com", "twitter.com", "github.com",
+             "youtube.com", "youtu.be", "arxiv.org"}
 
     count = 0
     for section in draft.sections:
         for item in section.items:
             url = item.url
             if not url or not url.startswith(("http://", "https://")):
+                continue
+            try:
+                domain = urlparse(url).netloc.lower().replace("www.", "")
+                if domain in _SKIP:
+                    continue
+            except Exception:
                 continue
             try:
                 img = extract_image(url, timeout=timeout)
