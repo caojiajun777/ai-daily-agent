@@ -1,0 +1,116 @@
+name: Health Check — source & pipeline monitoring
+
+# Runs every Monday at 10:00 Beijing time to check source freshness
+# and pipeline health. Sends alert email if issues found.
+
+on:
+  schedule:
+    - cron: "0 2 * * 1"   # Monday 10:00 CST = 02:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health-check:
+    name: Check source & pipeline health
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PUBLISH_TOKEN: ${{ secrets.GITHUB_PUBLISH_TOKEN }}
+      PUBLISH_REPO: ${{ secrets.PUBLISH_REPO }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      EMAIL_SUBSCRIBERS: ${{ secrets.EMAIL_SUBSCRIBERS }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install pyyaml httpx feedparser
+
+      - name: Run health check
+        id: health
+        run: |
+          python << 'PYEOF'
+          import json, os, sys
+          sys.path.insert(0, ".")
+          from agent.tools.monitor import full_monitoring_report
+
+          report = full_monitoring_report()
+          print(f"Sources: {report.summary['ok_sources']}/{report.summary['total_sources']} OK")
+          print(f"Alerts: {report.summary['alert_count']}")
+
+          for a in report.alerts:
+              print(f"  ⚠ {a}")
+
+          # Save report as JSON for artifact upload.
+          os.makedirs("artifacts/reports", exist_ok=True)
+          output = {
+              "checked_at": report.checked_at,
+              "summary": report.summary,
+              "alerts": report.alerts,
+              "sources": [
+                  {"id": s.source_id, "type": s.source_type, "status": s.status,
+                   "last_seen": s.last_seen, "note": s.note}
+                  for s in report.sources if s.status != "ok"
+              ],
+          }
+          with open("artifacts/reports/health_check.json", "w", encoding="utf-8") as f:
+              json.dump(output, f, ensure_ascii=False, indent=2)
+
+          # Set alert flag for next step.
+          if report.alerts:
+              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                  f.write(f"has_alerts=true\n")
+                  f.write(f"alert_text={json.dumps(chr(10).join(report.alerts))}\n")
+          PYEOF
+
+      - name: Send alert email
+        if: ${{ steps.health.outputs.has_alerts == 'true' }}
+        run: |
+          python << 'PYEOF'
+          import os, smtplib
+          from email.mime.text import MIMEText
+
+          smtp_user = os.getenv("SMTP_USER", "")
+          smtp_pass = os.getenv("SMTP_PASSWORD", "")
+          if not smtp_user or not smtp_pass:
+              print("SMTP not configured — skipping alert")
+              exit(0)
+
+          alert_text = "${{ steps.health.outputs.alert_text }}"
+          body = f"""AI 日报系统健康检查告警
+
+  检查时间：$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+  发现问题：
+
+  {alert_text}
+
+  查看详情：https://github.com/{os.getenv('PUBLISH_REPO','caojiajun777/ai-daily-agent')}/actions
+  """
+
+          msg = MIMEText(body, "plain", "utf-8")
+          msg["Subject"] = "⚠ AI 日报系统告警"
+          msg["From"] = smtp_user
+          msg["To"] = smtp_user  # send alert to sender/admin
+
+          with smtplib.SMTP_SSL("smtp.qq.com", 465, timeout=30) as s:
+              s.login(smtp_user, smtp_pass)
+              s.sendmail(smtp_user, [smtp_user], msg.as_string())
+          print("Alert email sent")
+          PYEOF
+
+      - name: Upload health report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: health-check
+          retention-days: 30
+          path: artifacts/reports/health_check.json
