@@ -1,0 +1,101 @@
+name: Agent — Manual Publish
+
+# Manual-only. NO cron in this phase.
+#
+# IMPORTANT — token policy:
+# This workflow MUST authenticate with the repo OWNER's PAT, not the default
+# GITHUB_TOKEN. Issues created by github-actions[bot] lack proper authorship
+# for audit attribution and resume/demo consistency. Configure a repository
+# secret named GITHUB_PUBLISH_TOKEN.
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Logical report date (YYYY-MM-DD). Must already have artifacts/drafts/<date>.{md,json} and artifacts/reports/<date>.json."
+        required: true
+        type: string
+      provider:
+        description: "LLM provider used to (re)generate the run if artifacts are missing."
+        required: false
+        default: "deepseek"
+        type: choice
+        options:
+          - deepseek
+          - mock
+      dry_run:
+        description: "Preview only (true) or actually create the GitHub issue (false)."
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Manual publish (gate-protected)
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PUBLISH_TOKEN: ${{ secrets.GITHUB_PUBLISH_TOKEN }}
+      PUBLISH_REPO: ${{ secrets.PUBLISH_REPO }}
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+    steps:
+      - name: Refuse to run without owner PAT
+        if: ${{ env.GITHUB_PUBLISH_TOKEN == '' }}
+        run: |
+          echo "::error::GITHUB_PUBLISH_TOKEN secret is not set."
+          echo "Issues must be created with the repo owner's PAT, not GITHUB_TOKEN."
+          echo "Bot-created issues lack audit attribution. Configure GITHUB_PUBLISH_TOKEN before running."
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Ensure run artifacts exist (regenerate if missing)
+        shell: bash
+        run: |
+          DATE="${{ inputs.date }}"
+          if [ ! -f "artifacts/drafts/${DATE}.json" ] || [ ! -f "artifacts/reports/${DATE}.json" ]; then
+            echo "Artifacts missing for ${DATE}; regenerating with provider=${{ inputs.provider }}"
+            python -m agent.cli run --provider "${{ inputs.provider }}" --date "${DATE}"
+          else
+            echo "Artifacts present for ${DATE}; skipping run."
+          fi
+
+      - name: Publish (dry-run preview)
+        if: ${{ inputs.dry_run == 'true' }}
+        run: |
+          python -m agent.cli publish-issue --run-id "${{ inputs.date }}" --dry-run
+
+      - name: Publish (confirmed)
+        if: ${{ inputs.dry_run == 'false' }}
+        run: |
+          python -m agent.cli publish-issue --run-id "${{ inputs.date }}" --confirm
+
+      - name: Upload publish artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-publish-${{ inputs.date }}
+          path: |
+            artifacts/drafts/${{ inputs.date }}.md
+            artifacts/drafts/${{ inputs.date }}.json
+            artifacts/reports/${{ inputs.date }}.json
+            artifacts/reports/publish_preview_${{ inputs.date }}.json
+            artifacts/reports/publish_result_${{ inputs.date }}.json
+            artifacts/traces/${{ inputs.date }}.jsonl
+          if-no-files-found: warn
