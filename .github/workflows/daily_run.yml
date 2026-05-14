@@ -118,9 +118,11 @@ jobs:
             > "artifacts/reports/scout_${{ steps.date.outputs.date }}.json" || true
           echo "Scout report saved to artifacts/reports/scout_${{ steps.date.outputs.date }}.json"
 
-      - name: Install Playwright browser
+      - name: Install Chinese fonts + Playwright browser
         if: ${{ inputs.dry_run != 'true' }}
-        run: python -m playwright install chromium
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk
+          python -m playwright install chromium
 
       - name: Send PDF via email
         if: ${{ inputs.dry_run != 'true' }}
