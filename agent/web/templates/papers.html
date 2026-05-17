@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}AI 日报 — 论文{% endblock %}
+{% block content %}
+
+<div class="hero">
+  <h1>论文收录</h1>
+  <p>顶会/顶刊论文 · {{ total }} 篇</p>
+</div>
+
+<div class="card">
+{% if papers %}
+  <ul class="report-list">
+  {% for p in papers %}
+    <li>
+      <div style="flex:1">
+        <a href="{{ p.source_url or '#' }}" target="_blank" style="font-weight:600;font-size:15px">{{ p.title[:120] }}</a>
+        <div class="report-meta">
+          {% if p.section %}{{ p.section }} · {% endif %}
+          {{ p._date }} · score: {{ '%.2f' % (p.score or 0) }}
+          {% if p.selected_reason %}<br>{{ p.selected_reason[:80] }}{% endif %}
+        </div>
+      </div>
+      <a href="{{ p.source_url or '#' }}" target="_blank" style="font-size:13px;color:var(--muted);white-space:nowrap">{{ p.source_name[:25] }} →</a>
+    </li>
+  {% endfor %}
+  </ul>
+{% else %}
+  <p style="text-align:center;padding:24px;color:var(--muted)">暂无论文。部署后每天 12:00 自动生成。</p>
+{% endif %}
+</div>
+
+{% endblock %}
