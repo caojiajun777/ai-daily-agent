@@ -124,6 +124,32 @@ def _load_subscribers() -> List[str]:
     return _load_subscribers()
 
 
+def _load_papers() -> List[Dict[str, Any]]:
+    """Load all paper items from curated artifacts."""
+    papers: List[Dict[str, Any]] = []
+    curated_dir = os.path.join(ARTIFACTS, "curated")
+    if not os.path.isdir(curated_dir):
+        return papers
+    paper_sources = {"arxiv", "hf_daily_papers"}
+    for fname in sorted(os.listdir(curated_dir), reverse=True):
+        if not fname.endswith(".json"):
+            continue
+        date = fname.replace(".json", "")
+        try:
+            with open(os.path.join(curated_dir, fname), "r", encoding="utf-8") as f:
+                data = json.load(f)
+            for item in data.get("items", []):
+                src = item.get("source_name", "")
+                # Check if this item is from a paper source.
+                is_paper = any(p in src for p in paper_sources)
+                if is_paper:
+                    item["_date"] = date
+                    papers.append(item)
+        except Exception:
+            pass
+    return papers
+
+
 def _source_distribution() -> List[Dict]:
     """Aggregate source distribution across all reports."""
     src_counts: Counter = Counter()
@@ -258,6 +284,17 @@ async def stats_page(request: Request):
         "stats": stats,
         "sources": sources,
         "reports": reports,
+    })
+
+
+@app.get("/papers", response_class=HTMLResponse)
+async def papers_page(request: Request):
+    """Papers archive — all arxiv/HF papers from curated artifacts."""
+    papers = _load_papers()
+    return _render("papers.html", {
+        "request": request,
+        "papers": papers,
+        "total": len(papers),
     })
 
 
