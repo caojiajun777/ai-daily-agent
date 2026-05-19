@@ -127,11 +127,14 @@ def _run_research_editor_flow(
     if provider.name == "deepseek":
         try:
             from agent.llm.factory import build_provider
-            editor_provider = build_provider("deepseek", model="deepseek-chat",
-                                             skip_model_check=True,
-                                             request_timeout_s=llm_timeout)
-        except Exception:
-            pass  # fall back to the default provider
+            editor_provider = build_provider(
+                "deepseek", model="deepseek-chat",
+                skip_model_check=True,
+                request_timeout_s=llm_timeout,
+            )
+            tracer.log("editor_model_switch", from_model=provider.model, to_model="deepseek-chat")
+        except Exception as e:
+            tracer.log("editor_model_switch_failed", error=str(e))
 
     editor_output = run_research_editor(
         events=events,

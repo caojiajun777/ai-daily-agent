@@ -135,7 +135,8 @@ def evaluate_publish_gate(
             f"(>{max_eval_issues}): {eval_issues}"
         )
 
-    # Semantic duplicate gate: block on high or medium severity.
+    # Semantic duplicate gate: block on high or medium severity,
+    # unless all blocking duplicates are same-URL (trivial auto-merge).
     sem_dup_path = artifacts.report.get("semantic_duplicate_report_path")
     if sem_dup_path and os.path.exists(sem_dup_path):
         try:
@@ -144,26 +145,46 @@ def evaluate_publish_gate(
                     json.load(f)
                 )
             for dup in sem_report.duplicates:
+                is_same_url = "相同URL" in (dup.reason or "") or "同一推文" in (dup.reason or "")
                 if dup.severity in ("high", "medium"):
-                    reasons.append(
-                        f"semantic_duplicate [{dup.severity}]: "
-                        f"{dup.item_a_id} ≈ {dup.item_b_id} — {dup.reason}"
-                    )
-                # low severity: add as warning in reasons for visibility but
-                # use a non-blocking prefix so callers can distinguish.
+                    if is_same_url:
+                        # Same-URL duplicates are trivial auto-merges — don't block.
+                        reasons.append(
+                            f"semantic_duplicate_warning [{dup.severity}]: "
+                            f"{dup.item_a_id} ≈ {dup.item_b_id} — {dup.reason}"
+                        )
+                    else:
+                        reasons.append(
+                            f"semantic_duplicate [{dup.severity}]: "
+                            f"{dup.item_a_id} ≈ {dup.item_b_id} — {dup.reason}"
+                        )
                 elif dup.severity == "low":
                     reasons.append(
                         f"semantic_duplicate_warning [low]: "
                         f"{dup.item_a_id} ≈ {dup.item_b_id} — {dup.reason}"
                     )
         except Exception:
-            pass  # Corrupt artifact: don't let it silently pass or abort.
+            pass
 
-    # Repair failure gate: if repair was attempted but did not succeed, block.
+    # Repair failure gate: block unless ALL duplicates are same-URL
+    # (where repair failure is expected — auto-merge is trivial).
     if artifacts.report.get("repair_attempted") and not artifacts.report.get("repair_succeeded"):
-        reasons.append(
-            "repair_failed: repair was attempted but did not succeed; manual review required"
-        )
+        blocking = True
+        if sem_dup_path and os.path.exists(sem_dup_path):
+            try:
+                with open(sem_dup_path, "r", encoding="utf-8") as f:
+                    sem_report2 = SemanticDuplicateReport.model_validate(json.load(f))
+                if sem_report2.duplicates:
+                    blocking = not all(
+                        "相同URL" in (d.reason or "") or "同一推文" in (d.reason or "")
+                        for d in sem_report2.duplicates
+                    )
+            except Exception:
+                pass
+        if blocking:
+            reasons.append(
+                "repair_failed: repair was attempted but did not succeed; manual review required"
+            )
 
     # Low-severity warnings are informational; only hard-block on non-warning reasons.
     blocking_reasons = [r for r in reasons if not r.startswith("semantic_duplicate_warning")]
