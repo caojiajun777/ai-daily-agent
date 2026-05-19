@@ -59,13 +59,12 @@ class XCookieAdapter:
         self.account_type = account_type
         self.max_age_hours = max_age_hours
 
-    def _get_proxy(self) -> str:
-        return os.getenv("X_PROXY", "") or os.getenv("HTTPS_PROXY", "") or ""
+    def _get_proxy(self) -> str | None:
+        p = os.getenv("X_PROXY", "") or os.getenv("HTTPS_PROXY", "") or ""
+        return p if p else None
 
     def fetch(self, *, max_items: int = 10) -> List[RawItem]:
         proxy = self._get_proxy()
-        if not proxy:
-            return []
 
         ua = (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -73,29 +72,37 @@ class XCookieAdapter:
             "Chrome/131.0.0.0 Safari/537.36"
         )
 
-        page = None
-        try:
-            page = _get_page(proxy, ua)
-            page.goto(
-                f"https://x.com/{self.username}",
-                wait_until="load",
-                timeout=20000,
-            )
-            page.wait_for_timeout(1500)
+        # Try with proxy first (for GFW environments), fall back to direct.
+        for attempt, use_proxy in enumerate([proxy, None]):
+            if attempt > 0 and proxy is None:
+                break  # no proxy configured, only one attempt needed
+            page = None
+            try:
+                page = _get_page(use_proxy or "", ua)
+                page.goto(
+                    f"https://x.com/{self.username}",
+                    wait_until="load",
+                    timeout=20000,
+                )
+                page.wait_for_timeout(1500)
 
-            html = page.content()
-            return _extract_tweets_from_html(
-                html, self.username, self.source_id,
-                self.account_type, self.max_age_hours, max_items,
-            )
-        except Exception:
-            return []
-        finally:
-            if page:
-                try:
-                    page.close()
-                except Exception:
-                    pass
+                html = page.content()
+                items = _extract_tweets_from_html(
+                    html, self.username, self.source_id,
+                    self.account_type, self.max_age_hours, max_items,
+                )
+                if items:
+                    return items
+            except Exception:
+                continue
+            finally:
+                if page:
+                    try:
+                        page.close()
+                    except Exception:
+                        pass
+
+        return []
 
 
 def _extract_tweets_from_html(

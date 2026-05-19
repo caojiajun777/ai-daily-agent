@@ -321,11 +321,33 @@ def temp_config(tmp_path):
     return str(config)
 
 
-def test_discover_sources_pipeline(discovery_provider, temp_config):
+def test_discover_sources_pipeline(discovery_provider, temp_config, tmp_path):
     """End-to-end: mock LLM → validate → score → report."""
+    # Write a local RSS file so the real-feed candidate passes without network.
+    rss_xml = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<rss version=\"2.0\"><channel><title>Test AI Blog</title>
+<link>https://example.com</link>
+<item><title>AI research breakthrough</title><link>https://example.com/1</link>
+<description>New model released</description>
+<pubDate>Mon, 19 May 2026 10:00:00 GMT</pubDate></item>
+<item><title>Deep learning advances</title><link>https://example.com/2</link>
+<description>Better training methods</description>
+<pubDate>Mon, 19 May 2026 09:00:00 GMT</pubDate></item>
+</channel></rss>"""
+    local_rss_path = tmp_path / "test_blog_feed.xml"
+    local_rss_path.write_text(rss_xml, encoding="utf-8")
+
+    # Override the mock candidate URL with local path.
+    candidates = json.loads(_candidate_response)
+    candidates[0]["url"] = str(local_rss_path)  # Test AI Blog → local RSS
+
+    def responder(messages):
+        return json.dumps(candidates)
+    provider = MockLLMProvider(model="mock-discovery", responder=responder)
+
     report = discover_sources(
         topic="broad",
-        provider=discovery_provider,
+        provider=provider,
         existing_config_path=temp_config,
         max_candidates=10,
         min_score=0.3,
@@ -335,7 +357,7 @@ def test_discover_sources_pipeline(discovery_provider, temp_config):
     assert report.topic == "broad"
     assert report.candidates_generated == 3
 
-    # The real HF feed should pass; the fake feed should fail.
+    # The local RSS feed should pass; the fake feed should fail.
     assert report.candidates_passed >= 1
     passed_names = [c.name for c in report.passed]
     assert "Test AI Blog" in passed_names
@@ -345,7 +367,6 @@ def test_discover_sources_pipeline(discovery_provider, temp_config):
     assert "Fake News Site" in rejected_names
 
     # X account: without X_BEARER_TOKEN, gets a pass with estimated scores.
-    # Should appear in passed if score is high enough.
     assert any(c.source_type == "x" for c in report.passed)
 
     # YAML snippet should be generated for passed sources.

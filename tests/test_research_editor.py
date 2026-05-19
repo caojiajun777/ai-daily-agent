@@ -223,7 +223,7 @@ def test_full_pipeline_smoke(cfg, prompts, tmp_path):
     import re as _re
 
     # Mock provider: dynamically match event IDs from the user prompt.
-    section_cycle = ["要闻", "模型发布", "开发生态", "产品应用", "技术与洞察", "行业动态"]
+    section_cycle = ["今日头条", "模型前沿", "工具与开源", "论文精选", "产品落地", "业界风向"]
     call_count = [0]
 
     def responder(msgs):
@@ -252,21 +252,45 @@ def test_full_pipeline_smoke(cfg, prompts, tmp_path):
         if "语义重复" in system or "duplicates" in system or "修复" in system:
             return json.dumps({"duplicates": []})
 
-        # Writer response.
+        # Writer response — use real source URLs to avoid critic hallucinations.
         return json.dumps({
             "date": "2026-05-15", "title": "AI Daily Test", "overview": "Test smoke.",
             "sections": [{"heading": h, "items": [
                 {"title": f"#{n+1} test item {h}", "summary": "summary",
-                 "url": "https://example.com", "source": "mock",
+                 "url": f"https://example.com/{(n % 5) + 1}", "source": "mock",
                  "highlights": ["a"], "related_links": []}
             ]} for n, h in enumerate(section_cycle)],
         }, ensure_ascii=False)
 
     provider = MockLLMProvider(model="mock-smoke", responder=responder)
 
+    # Write a local RSS file so the test works without network.
+    rss_feed = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+  <title>Test Feed</title>
+  <link>https://example.com</link>
+  <item><title>Test AI News 1</title><link>https://example.com/1</link>
+    <description>An AI model announcement</description>
+    <pubDate>Mon, 19 May 2026 10:00:00 GMT</pubDate></item>
+  <item><title>Test AI News 2</title><link>https://example.com/2</link>
+    <description>A new framework release</description>
+    <pubDate>Mon, 19 May 2026 09:00:00 GMT</pubDate></item>
+  <item><title>Test AI News 3</title><link>https://example.com/3</link>
+    <description>AI product launch today</description>
+    <pubDate>Mon, 19 May 2026 08:00:00 GMT</pubDate></item>
+  <item><title>Test AI News 4</title><link>https://example.com/4</link>
+    <description>Funding round for AI startup</description>
+    <pubDate>Mon, 19 May 2026 07:00:00 GMT</pubDate></item>
+  <item><title>Test AI News 5</title><link>https://example.com/5</link>
+    <description>Research paper on transformers</description>
+    <pubDate>Mon, 19 May 2026 06:00:00 GMT</pubDate></item>
+</channel></rss>"""
+    rss_path = tmp_path / "test_feed.xml"
+    rss_path.write_text(rss_feed, encoding="utf-8")
+
     cfg2 = dict(cfg)
     cfg2["sources"] = [
-        {"id": "hf_blog", "type": "rss", "url": "https://huggingface.co/blog/feed.xml", "weight": 1.0, "max_items": 5},
+        {"id": "test_feed", "type": "rss", "url": str(rss_path), "weight": 1.0, "max_items": 5},
     ]
     cfg2["curation"] = {
         "mode": "research_editor",
@@ -300,7 +324,7 @@ def test_full_pipeline_smoke(cfg, prompts, tmp_path):
     with open(draft_path, "r", encoding="utf-8") as f:
         md = f.read()
     assert "AI Daily Test" in md
-    assert "要闻" in md
+    assert "今日头条" in md
 
     curated_path = result.get("curated_path")
     assert curated_path and os.path.exists(curated_path), "No curated_path"
