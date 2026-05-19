@@ -1,0 +1,335 @@
+"""Tests for Research Editor curation pipeline."""
+
+import json
+import os
+import pytest
+from agent.agents.event_clusterer import cluster_items, EventCluster
+from agent.agents.event_scorer import score_events
+from agent.agents.research_editor import (
+    ResearchEditorOutput, EditorialDecision, SourceUse,
+    _parse_and_validate,
+)
+from agent.agents.final_selector import select_final_items
+from agent.sources.base import RawItem
+
+
+def make_item(sid, url, title, summary="", stype="rss"):
+    return RawItem(source_id=sid, source_type=stype, title=title,
+                   url=url, summary=summary, published_at="2026-05-11T00:00:00Z")
+
+
+# Event Clustering
+
+def test_cluster_same_title():
+    items = [make_item("a", "https://a.com/1", "GPT-5.5 Released"),
+             make_item("b", "https://b.com/1", "GPT-5.5 Released")]
+    clusters = cluster_items(items)
+    assert len(clusters) == 1
+    assert clusters[0].source_count == 2
+
+
+def test_cluster_different_events():
+    items = [make_item("a", "https://a.com/1", "GPT-5.5 Released"),
+             make_item("b", "https://b.com/2", "Claude 4 Released")]
+    clusters = cluster_items(items)
+    assert len(clusters) == 2
+
+
+def test_cluster_similar_titles():
+    items = [make_item("a", "https://a.com/1", "OpenAI releases GPT-5.5"),
+             make_item("b", "https://b.com/2", "OpenAI Releases GPT-5.5!")]
+    clusters = cluster_items(items)
+    assert len(clusters) == 1
+
+
+def test_cluster_strips_tracking():
+    items = [make_item("a", "https://x.com/page?utm_source=tw", "News"),
+             make_item("b", "https://x.com/page", "News")]
+    clusters = cluster_items(items)
+    assert len(clusters) == 1
+
+
+def test_cluster_official_wins_primary():
+    items = [make_item("x_kol", "https://x.com/post", "GPT-5 Released by OpenAI", stype="x"),
+             make_item("openai_news", "https://openai.com/index/gpt-5", "GPT-5 Released by OpenAI", stype="rss")]
+    clusters = cluster_items(items)
+    assert len(clusters) == 1
+    assert "openai_news" in clusters[0].source_names
+
+
+# Rule Scoring
+
+def test_scoring_official_higher():
+    official = EventCluster(
+        event_id="evt_1", canonical_title="GPT-5.5 Release",
+        primary_url="https://openai.com/gpt5", source_urls=["https://openai.com/gpt5"],
+        source_names=["openai_news"], source_types=["rss"], source_count=1,
+        summary="OpenAI releases GPT-5.5.",
+    )
+    kol = EventCluster(
+        event_id="evt_2", canonical_title="some speculation",
+        primary_url="https://x.com/r/post", source_urls=["https://x.com/r/post"],
+        source_names=["random_kol"], source_types=["x"], source_count=1,
+        summary="speculation.",
+    )
+    scored = score_events([official, kol])
+    assert scored[0].event_id == "evt_1"
+
+
+def test_scoring_ai_irrelevant_lower():
+    good = EventCluster(
+        event_id="evt_a", canonical_title="New AI model released",
+        primary_url="https://x.com/y", source_urls=["https://x.com/y"],
+        source_names=["src"], source_types=["x"], source_count=1,
+        summary="A new large language model.",
+    )
+    bad = EventCluster(
+        event_id="evt_b", canonical_title="New phone charger",
+        primary_url="https://x.com/z", source_urls=["https://x.com/z"],
+        source_names=["src2"], source_types=["x"], source_count=1,
+        summary="USB-C charger.",
+    )
+    scored = score_events([bad, good])
+    assert scored[0].event_id == "evt_a"
+
+
+# Research Editor Schema
+
+def test_valid_editor_output():
+    output = ResearchEditorOutput.model_validate({
+        "selected": [{"event_id": "evt_x", "decision": "select",
+                      "priority": "high", "section": "模型发布",
+                      "evidence_level": "official", "novelty": "new_event",
+                      "reader_utility": "high", "why_it_matters": "x",
+                      "writing_angle": "x", "risk_level": "low",
+                      "sources_to_use": [{"url": "https://o.com", "role": "primary"}]}],
+        "rejected": [],
+    })
+    assert len(output.selected) == 1
+
+
+def test_fake_event_id_filtered():
+    event = EventCluster(
+        event_id="evt_real", canonical_title="Real",
+        primary_url="https://real.com", source_urls=["https://real.com"],
+        source_names=["src"], source_types=["rss"], source_count=1,
+        summary="Real.",
+    )
+    raw = json.dumps({"selected": [{"event_id": "evt_fake", "decision": "select",
+                       "priority": "high", "section": "要闻",
+                       "evidence_level": "primary", "novelty": "new_event",
+                       "reader_utility": "high", "why_it_matters": "x",
+                       "writing_angle": "x", "risk_level": "low",
+                       "sources_to_use": []}], "rejected": []})
+    output = _parse_and_validate(raw, [event])
+    assert len(output.selected) == 0
+
+
+def test_fake_url_auto_fixed():
+    event = EventCluster(
+        event_id="evt_1", canonical_title="News",
+        primary_url="https://official.com", source_urls=["https://official.com"],
+        source_names=["src"], source_types=["rss"], source_count=1,
+        summary="News.",
+    )
+    raw = json.dumps({"selected": [{"event_id": "evt_1", "decision": "select",
+                       "priority": "high", "section": "要闻",
+                       "evidence_level": "primary", "novelty": "new_event",
+                       "reader_utility": "high", "why_it_matters": "x",
+                       "writing_angle": "x", "risk_level": "low",
+                       "sources_to_use": [{"url": "https://fake.com", "role": "primary"}]}],
+                       "rejected": []})
+    output = _parse_and_validate(raw, [event])
+    assert len(output.selected) == 1
+    assert output.selected[0].sources_to_use[0].url == "https://official.com"
+
+
+# Final Selector
+
+def test_fallback_when_llm_empty():
+    events = [EventCluster(event_id=f"evt_{i}", canonical_title=f"E{i}",
+                primary_url=f"https://x.com/{i}", source_urls=[f"https://x.com/{i}"],
+                source_names=[f"s{i}"], source_types=["rss"], source_count=1,
+                summary=f"S{i}", rule_score=0.8) for i in range(30)]
+    output = ResearchEditorOutput(selected=[], rejected=[])
+    items, recs, meta = select_final_items(
+        editor_output=output, events=events, min_items=16, max_items=22)
+    assert meta["fallback_used"]
+    assert len(items) >= 16
+
+
+# URL validation — fabricated URLs are dropped with warnings
+
+def test_llm_fake_url_dropped_with_warning():
+    event = EventCluster(
+        event_id="evt_1", canonical_title="News",
+        primary_url="https://official.com/article",
+        source_urls=["https://official.com/article"],
+        source_names=["src"], source_types=["rss"], source_count=1,
+        summary="News.",
+    )
+    # LLM outputs a fabricated URL not in source_urls.
+    raw = json.dumps({
+        "selected": [{
+            "event_id": "evt_1", "decision": "select",
+            "priority": "high", "section": "要闻",
+            "evidence_level": "primary", "novelty": "new_event",
+            "reader_utility": "high", "why_it_matters": "x",
+            "writing_angle": "x", "risk_level": "low",
+            "sources_to_use": [
+                {"url": "https://fabricated-by-llm.com/fake", "role": "primary"},
+            ],
+        }],
+        "rejected": [],
+    })
+    output = _parse_and_validate(raw, [event])
+    # Should still have the event selected.
+    assert len(output.selected) == 1
+    # Fake URL should be dropped, fallback to event's primary_url.
+    assert output.selected[0].sources_to_use[0].url == "https://official.com/article"
+    # Warning should be recorded.
+    assert output.notes and "invalid_llm_url_removed" in output.notes
+
+
+def test_fake_event_id_dropped():
+    event = EventCluster(
+        event_id="evt_real", canonical_title="Real",
+        primary_url="https://real.com", source_urls=["https://real.com"],
+        source_names=["src"], source_types=["rss"], source_count=1,
+        summary="Real.",
+    )
+    raw = json.dumps({
+        "selected": [{"event_id": "evt_nonexistent", "decision": "select",
+                      "priority": "high", "section": "要闻",
+                      "evidence_level": "primary", "novelty": "new_event",
+                      "reader_utility": "high", "why_it_matters": "x",
+                      "writing_angle": "x", "risk_level": "low",
+                      "sources_to_use": [{"url": "https://real.com", "role": "primary"}]}],
+        "rejected": [],
+    })
+    output = _parse_and_validate(raw, [event])
+    assert len(output.selected) == 0
+    assert "invalid_event_id" in (output.notes or "")
+
+
+# Full pipeline smoke test (mock LLM, no network)
+
+
+
+def test_full_pipeline_smoke(cfg, prompts, tmp_path):
+    """End-to-end pipeline smoke test with mock LLM, zero network."""
+    from agent.pipelines.daily_report import run_pipeline
+    from agent.llm.mock_provider import MockLLMProvider
+    import re as _re
+
+    # Mock provider: dynamically match event IDs from the user prompt.
+    section_cycle = ["要闻", "模型发布", "开发生态", "产品应用", "技术与洞察", "行业动态"]
+    call_count = [0]
+
+    def responder(msgs):
+        call_count[0] += 1
+        system = msgs[0].content if msgs else ""
+        user = msgs[-1].content if len(msgs) > 1 else ""
+
+        # Research Editor call.
+        if "面向 AI 开发者" in system:
+            evt_ids = _re.findall(r"\[(evt_[a-f0-9]+)\]", user)
+            selected = []
+            for idx, eid in enumerate(evt_ids[:8]):
+                selected.append({
+                    "event_id": eid, "decision": "select",
+                    "priority": "must_include" if idx < 2 else "high",
+                    "section": section_cycle[idx % 6],
+                    "evidence_level": "primary", "novelty": "new_event",
+                    "reader_utility": "high" if idx < 3 else "medium",
+                    "why_it_matters": f"Reason for {eid}",
+                    "writing_angle": f"Angle for {eid}",
+                    "risk_level": "low", "sources_to_use": [],
+                })
+            return json.dumps({"selected": selected, "rejected": [], "notes": ""}, ensure_ascii=False)
+
+        # Semantic duplicate critic / repairer: return no duplicates.
+        if "语义重复" in system or "duplicates" in system or "修复" in system:
+            return json.dumps({"duplicates": []})
+
+        # Writer response.
+        return json.dumps({
+            "date": "2026-05-15", "title": "AI Daily Test", "overview": "Test smoke.",
+            "sections": [{"heading": h, "items": [
+                {"title": f"#{n+1} test item {h}", "summary": "summary",
+                 "url": "https://example.com", "source": "mock",
+                 "highlights": ["a"], "related_links": []}
+            ]} for n, h in enumerate(section_cycle)],
+        }, ensure_ascii=False)
+
+    provider = MockLLMProvider(model="mock-smoke", responder=responder)
+
+    cfg2 = dict(cfg)
+    cfg2["sources"] = [
+        {"id": "hf_blog", "type": "rss", "url": "https://huggingface.co/blog/feed.xml", "weight": 1.0, "max_items": 5},
+    ]
+    cfg2["curation"] = {
+        "mode": "research_editor",
+        "candidate_top_k": 30,
+        "final_min_items": 3,
+        "final_max_items": 10,
+        "history_window_days": 7,
+        "fallback_to_rules": True,
+        "legacy_llm_scoring_enabled": False,
+        "enable_evidence_fetch": False,
+    }
+
+    result = run_pipeline(
+        cfg=cfg2, prompts=prompts, provider=provider,
+        artifacts_root=str(tmp_path / "artifacts"),
+        date="2026-05-15",
+    )
+
+    assert not result.get("is_failed"), f"Pipeline failed: {result}"
+    # Check if pipeline failed gracefully via needs_human_review.
+    if result.get("needs_human_review"):
+        # Check stages for more detail.
+        stages = result.get("stages", {})
+        for name, s in stages.items():
+            if s.get("status") not in ("ok", "pending"):
+                print(f"  Stage {name}: {s.get('status')} error={s.get('error','')}")
+    draft_path = result.get("draft_path")
+    assert draft_path, f"No draft_path in result. Stages: {result.get('stages', {})}"
+    assert os.path.exists(draft_path), f"Draft not found: {draft_path}"
+
+    with open(draft_path, "r", encoding="utf-8") as f:
+        md = f.read()
+    assert "AI Daily Test" in md
+    assert "要闻" in md
+
+    curated_path = result.get("curated_path")
+    assert curated_path and os.path.exists(curated_path), "No curated_path"
+
+    trace_path = result.get("trace_path")
+    assert trace_path and os.path.exists(trace_path)
+
+    assert call_count[0] >= 2  # editor + writer
+
+
+# Pipeline smoke test
+
+def test_pipeline_rules_only(cfg, prompts):
+    from agent.pipelines.daily_report import run_pipeline
+    from agent.llm.mock_provider import MockLLMProvider
+
+    def responder(msgs):
+        return json.dumps({
+            "date": "2026-05-11", "title": "AI Daily", "overview": "Test.",
+            "sections": [{"heading": h, "items": [
+                {"title": f"#{i} t", "summary": "t", "url": "https://x.com",
+                 "source": "m", "highlights": ["a","b"], "related_links": []}
+            ]} for h in ["要闻","模型发布","开发生态","产品应用","技术与洞察","行业动态"]],
+        })
+    provider = MockLLMProvider(model="mock", responder=responder)
+    cfg2 = dict(cfg)
+    cfg2["curation"] = {"mode": "rules_only", "candidate_top_k": 20,
+                        "final_min_items": 6, "final_max_items": 12,
+                        "fallback_to_rules": True}
+    result = run_pipeline(cfg=cfg2, prompts=prompts, provider=provider,
+                          artifacts_root="artifacts", date="2026-05-11")
+    assert not result.get("is_failed")

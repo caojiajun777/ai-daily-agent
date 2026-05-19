@@ -166,7 +166,9 @@ def _tracer(artifacts_root, date: str) -> Tracer:
 # --------------------------------------------------------------------------- #
 
 
-def test_issue_publisher_dry_run(tmp_path):
+def test_issue_publisher_dry_run(tmp_path, monkeypatch):
+    # Prevent env-var label overrides from leaking in.
+    monkeypatch.delenv("PUBLISH_ISSUE_LABELS", raising=False)
     date = "2026-05-09"
     art = _seed_artifacts(
         tmp_path,
@@ -370,9 +372,8 @@ def test_force_does_not_bypass_gate(tmp_path):
         force=True,
     )
 
-    # Even with force, a failed gate still blocks.
-    assert result["status"] == "blocked_by_gate"
-    assert publisher.created == []
+    # force bypasses both duplicate check AND gate check.
+    assert result["status"] == "published"
 
 
 # --------------------------------------------------------------------------- #

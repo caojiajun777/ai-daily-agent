@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}AI 日报 — Token 用量{% endblock %}
+{% block content %}
+
+<div class="hero">
+  <h1>Token 用量 & 成本</h1>
+  <p>内部运维面板</p>
+</div>
+
+{% set total_in = namespace(val=0) %}{% set total_out = namespace(val=0) %}{% set total_cost = namespace(val=0) %}
+{% for r in reports %}{% set total_in.val = total_in.val + r.total_in %}{% set total_out.val = total_out.val + r.total_out %}{% set total_cost.val = total_cost.val + r.total_cost %}{% endfor %}
+
+<div class="stats-row">
+  <div class="stat-card"><div class="stat-value">{{ (total_in.val / 1000)|int }}K</div><div class="stat-label">累计 Token 输入</div></div>
+  <div class="stat-card"><div class="stat-value">{{ (total_out.val / 1000)|int }}K</div><div class="stat-label">累计 Token 输出</div></div>
+  <div class="stat-card"><div class="stat-value">${{ '%.4f' % total_cost.val }}</div><div class="stat-label">累计成本</div></div>
+  <div class="stat-card"><div class="stat-value">{{ reports|length }}</div><div class="stat-label">期数</div></div>
+</div>
+
+<div class="card">
+  <h2>每日消耗</h2>
+  <table style="width:100%;font-size:13px;border-collapse:collapse">
+    <tr style="border-bottom:1px solid var(--border);text-align:left">
+      <th style="padding:8px">日期</th><th>Input</th><th>Output</th><th>调用</th><th>成本</th><th>Provider</th>
+      <th>各阶段</th>
+    </tr>
+    {% for r in reports[:30] %}
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px;font-weight:600">{{ r.date }}</td>
+      <td>{{ (r.total_in / 1000)|int }}K</td>
+      <td>{{ (r.total_out / 1000)|int }}K</td>
+      <td>{{ r.total_calls }}</td>
+      <td style="color:var(--green)">${{ '%.4f' % r.total_cost }}</td>
+      <td style="font-size:12px">{{ r.provider }}/{{ r.model }}</td>
+      <td style="font-size:11px;color:var(--muted)">
+        {% for stage, info in r.by_stage.items() %}
+        {{ stage }}:{{ info.in }}→{{ info.out }}{% if not loop.last %}, {% endif %}
+        {% endfor %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+{% endblock %}

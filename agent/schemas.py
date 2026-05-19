@@ -112,3 +112,66 @@ class RepairReport(BaseModel):
     pre_duplicate_count: int = 0
     post_duplicate_count: Optional[int] = None
     draft_version: str = "v1"       # "v1" | "v2"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Trend Intelligence Layer schemas
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class TrendEvidence(BaseModel):
+    date: str = ""
+    event_id: str = ""
+    title: str = ""
+    source_names: List[str] = []
+    urls: List[str] = []
+    section: str = ""
+    priority: str = ""
+    evidence_level: str = ""
+
+
+class TrendFinding(BaseModel):
+    trend_id: str = ""
+    editorial_title: str = ""
+    analytical_title: str = ""
+    trend_type: Literal["topic", "entity", "capability", "market", "weak_signal", "noise"] = "topic"
+    direction: Literal["rising", "stable", "declining", "mixed"] = "stable"
+    confidence: Literal["high", "medium", "low"] = "medium"
+    window_type: Literal["short_signal", "weekly_trend", "confirmed_trend", "structural_movement"] = "short_signal"
+    summary: str = ""
+    evidence_event_ids: List[str] = []
+    timeline_evidence: List[TrendEvidence] = []
+    supporting_metrics: dict = Field(default_factory=dict)
+    companies_to_watch: List[str] = []
+    why_it_matters: str = ""
+    implications: str = ""
+    counter_signals: str = ""
+    risk_of_overinterpretation: str = ""
+    what_to_watch_next: str = ""
+
+
+class HeatChange(BaseModel):
+    category: str = ""
+    direction: Literal["heating", "cooling", "stable"] = "stable"
+    evidence: str = ""
+    evidence_event_ids: List[str] = []
+
+
+class TrendReport(BaseModel):
+    report_id: str = ""
+    generated_at: str = ""
+    days: int = 7
+    start_date: str = ""
+    end_date: str = ""
+    headline_summary: str = ""
+    findings: List[TrendFinding] = []
+    heat_changes: List[HeatChange] = []
+    weak_signals: List[TrendFinding] = []
+    noise_or_hype: List[TrendFinding] = []
+    next_week_watchlist: List[str] = []
+    data_quality_notes: str = ""
+    total_events: int = 0
+    total_findings: int = 0
+    metrics_fallback_used: bool = False
+    validation_warnings: List[str] = []
+    taxonomy_counts: dict = Field(default_factory=dict)

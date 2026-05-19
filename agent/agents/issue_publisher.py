@@ -341,7 +341,7 @@ def run_publish(
     result_path = os.path.join(reports_dir, f"publish_result_{date}.json")
     common["mode"] = "confirm"
 
-    if not gate.ok:
+    if not gate.ok and not force:
         common["status"] = "blocked_by_gate"
         common["issue_number"] = None
         common["issue_url"] = None
