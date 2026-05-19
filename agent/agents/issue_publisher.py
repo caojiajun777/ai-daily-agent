@@ -251,6 +251,7 @@ def run_publish(
     tracer: Tracer,
     mode: str,  # "dry-run" | "confirm"
     force: bool = False,
+    force_dup: bool = False,
 ) -> Dict[str, Any]:
     if mode not in ("dry-run", "confirm"):
         raise ValueError(f"mode must be dry-run or confirm, got {mode!r}")
@@ -289,7 +290,7 @@ def run_publish(
             # preview rather than have it abort the whole flow.
             tracer.log("publish_dup_check_failed", error=str(e))
             duplicates = []
-    duplicate_blocked = bool(duplicates) and not force
+    duplicate_blocked = bool(duplicates) and not force and not force_dup
 
     reports_dir = os.path.join(artifacts_root, "reports")
     os.makedirs(reports_dir, exist_ok=True)

@@ -213,6 +213,7 @@ def cmd_publish_issue(args: argparse.Namespace) -> int:
             tracer=tracer,
             mode="dry-run" if args.dry_run else "confirm",
             force=bool(args.force),
+            force_dup=bool(args.force_dup),
         )
     except FileNotFoundError as e:
         print(f"missing artifact: {e}", file=sys.stderr)
@@ -686,8 +687,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_pub.add_argument(
         "--force",
         action="store_true",
-        help="permit publishing even when a duplicate issue exists "
-        "(NEVER bypasses the publish gate)",
+        help="bypass both publish gate and duplicate check",
+    )
+    p_pub.add_argument(
+        "--force-dup",
+        action="store_true",
+        help="bypass only the duplicate check (gate still applies)",
     )
     p_pub.add_argument(
         "--repo",

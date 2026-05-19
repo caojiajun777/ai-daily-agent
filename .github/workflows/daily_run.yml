@@ -97,7 +97,8 @@ jobs:
         run: |
           python -m agent.cli publish-issue \
             --run-id "${{ steps.date.outputs.date }}" \
-            --confirm
+            --confirm \
+            --force-dup
 
       # ─────────────────────────────────────────────────────────
       # Stage 3: Source Scout + Auto-Admit
