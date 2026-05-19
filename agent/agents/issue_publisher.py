@@ -135,9 +135,12 @@ def evaluate_publish_gate(
             f"(>{max_eval_issues}): {eval_issues}"
         )
 
-    # Semantic duplicate gate: block on high or medium severity,
-    # unless all blocking duplicates are same-URL (trivial auto-merge).
+    # Semantic duplicate gate: block on high/medium duplicates only if
+    # repair was NOT attempted or NOT successful. When repair succeeded,
+    # the post-repair draft is clean — the critic already verified it.
     sem_dup_path = artifacts.report.get("semantic_duplicate_report_path")
+    repair_ok = artifacts.report.get("repair_succeeded", False)
+
     if sem_dup_path and os.path.exists(sem_dup_path):
         try:
             with open(sem_dup_path, "r", encoding="utf-8") as f:
@@ -147,8 +150,8 @@ def evaluate_publish_gate(
             for dup in sem_report.duplicates:
                 is_same_url = "相同URL" in (dup.reason or "") or "同一推文" in (dup.reason or "")
                 if dup.severity in ("high", "medium"):
-                    if is_same_url:
-                        # Same-URL duplicates are trivial auto-merges — don't block.
+                    if repair_ok or is_same_url:
+                        # Repair already fixed this, or same-URL trivial merge.
                         reasons.append(
                             f"semantic_duplicate_warning [{dup.severity}]: "
                             f"{dup.item_a_id} ≈ {dup.item_b_id} — {dup.reason}"
@@ -166,9 +169,8 @@ def evaluate_publish_gate(
         except Exception:
             pass
 
-    # Repair failure gate: block unless ALL duplicates are same-URL
-    # (where repair failure is expected — auto-merge is trivial).
-    if artifacts.report.get("repair_attempted") and not artifacts.report.get("repair_succeeded"):
+    # Repair failure gate.
+    if artifacts.report.get("repair_attempted") and not repair_ok:
         blocking = True
         if sem_dup_path and os.path.exists(sem_dup_path):
             try:
