@@ -187,7 +187,7 @@ def run_research_editor(
                 LLMMessage(role="user", content=user_msg),
             ],
             temperature=0.1,
-            max_output_tokens=3072,
+            max_output_tokens=6144,
         )
 
         if tracer:
