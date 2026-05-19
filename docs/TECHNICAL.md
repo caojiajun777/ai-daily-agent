@@ -183,7 +183,8 @@
 - `LLMProvider` Protocol：统一接口
 - `DeepSeekProvider`：OpenAI-compatible SDK，支持 `deepseek-chat` 和 `deepseek-v4-pro`
 - `MockLLMProvider`：离线测试用，自定义 responder 函数
-- **关键规则**：需要结构化 JSON 的 Stage 用 `deepseek-chat`，禁止推理模型
+- **关键规则**：需要结构化 JSON 的 Stage 用非推理模型，禁止推理模型
+- **自定义 API 网关约束**：`DEEPSEEK_BASE_URL` 仅暴露 `deepseek-v4-flash` + `deepseek-v4-pro`，`deepseek-chat` 需 `skip_model_check=True` 才能使用（网关仍接受该模型名并正确路由）
 
 ---
 

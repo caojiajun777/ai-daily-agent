@@ -28,14 +28,20 @@ SourceDiscoverer → Collector → EventClusterer → EventScorer
 
 ### LLM 模型策略（关键）
 
-| Stage | 模型 | 原因 |
-|-------|------|------|
-| **ResearchEditor** | **deepseek-chat** | v4-pro 推理模型输出 0 条；chat 生成结构化 JSON 稳定 |
-| **Writer** | **deepseek-chat** | v4-pro 生成格式损坏的 JSON（`Expecting ',' delimiter`） |
-| SemanticDuplicate | deepseek-v4-pro | 简单输出，v4-pro 可用 |
-| Scout LLM 发现 | **deepseek-chat** | 同 ResearchEditor，需要结构化 JSON |
+自定义 API 网关（`DEEPSEEK_BASE_URL`）只暴露两个模型：`deepseek-v4-flash` 和 `deepseek-v4-pro`。
+**没有 `deepseek-chat`**——但网关仍接受该模型名并正确路由。`_verify_model()` 会因为模型不在列表
+而抛 `ModelUnavailable`，需要用 `skip_model_check=True` 绕过。
+
+| Stage | 模型 | skip_model_check | 原因 |
+|-------|------|:-:|------|
+| **ResearchEditor** | deepseek-chat | 是 | v4-pro 输出 0 条；chat 生成结构化 JSON 稳定 |
+| **Writer** | deepseek-chat | 是 | v4-pro 生成格式损坏的 JSON |
+| SemanticDuplicate | deepseek-v4-pro | — | 简单输出，v4-pro 可用 |
+| **Scout LLM 发现** | **deepseek-v4-flash** | 是 | 网关可用 + 结构化 JSON（不可用 chat） |
 
 **禁止在需要结构化 JSON 输出的 Stage 使用 v4-pro 推理模型。** v4-pro 花几百秒"思考"但输出极短或格式损坏。
+
+Scout CLI 新增 `--skip-model-check` 选项（`agent/cli.py`），用于绕过网关模型列表验证。
 
 ### ResearchEditor 调试备忘
 
@@ -304,11 +310,12 @@ uvicorn agent.web.app:app --reload --port 8000
 ## 当前状态
 
 - v2.2 架构：ResearchEditor + Writer 均用 deepseek-chat，X 源 CI 直连
+- 自定义 API 网关仅暴露 `deepseek-v4-flash` + `deepseek-v4-pro`（无 `deepseek-chat`），通过 `skip_model_check=True` 绕过
 - 6 板块新分类（今日头条/模型前沿/工具与开源/论文精选/产品落地/业界风向）
 - 论文配额（min 5 篇）在 curator 和 final_selector 双路径保障
 - CI 每日 12:00 CST 自动运行（`daily_run.yml`）
-- 订阅推送 CI 独立触发（`subscribe.yml`）
 - 测试 CI 在 push/PR 时自动运行（`test.yml`）
 - 46 个有效信息源：23 X/Twitter + 20 RSS + arXiv + AI Hot + 36kr
-- Scout 源发现每日运行，dry-run 模式（结果在 artifact）
-- 已知改进空间：ResearchEditor LLM 仍偶尔选 0 条（需监控 editor_parse_result trace），内容链扩散通道偶有网络波动
+- Scout 源发现每日运行（deepseek-v4-flash + skip-model-check），dry-run 模式
+- Scout CLI 有 `--skip-model-check` 选项；`admit-sources` 支持 `--dry-run`
+- 已知：自定义网关不支持 `deepseek-chat` 模型名，所有用该模型的 Stage 必须 `skip_model_check=True`
