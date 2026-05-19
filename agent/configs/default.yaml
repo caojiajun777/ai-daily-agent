@@ -413,6 +413,27 @@ sources:
     max_items: 5
 
   # ═══════════════════════════════════════════════════════════════
+  # RSS — 硅谷资本与行业叙事
+  # ═══════════════════════════════════════════════════════════════
+  - id: "techcrunch_ai"
+    type: "rss"
+    url: "https://techcrunch.com/category/artificial-intelligence/feed/"
+    weight: 0.95
+    max_items: 8
+
+  - id: "the_verge_ai"
+    type: "rss"
+    url: "https://www.theverge.com/ai-artificial-intelligence/rss/index.xml"
+    weight: 0.9
+    max_items: 8
+
+  - id: "theinformation_ai"
+    type: "rss"
+    url: "https://www.theinformation.com/feed?tag=artificial-intelligence"
+    weight: 0.85
+    max_items: 6
+
+  # ═══════════════════════════════════════════════════════════════
   # ═══════════════════════════════════════════════════════════════
   # AI HOT Daily — curated Chinese AI news with source attribution
   # ═══════════════════════════════════════════════════════════════
@@ -443,6 +464,12 @@ sources:
     type: "rss"
     url: "https://www.qbitai.com/feed"
     weight: 0.8
+    max_items: 6
+
+  - id: "36kr_ai"
+    type: "rss"
+    url: "https://36kr.com/feed?cid=330"
+    weight: 0.75
     max_items: 6
 
   # ═══════════════════════════════════════════════════════════════

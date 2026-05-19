@@ -100,11 +100,12 @@ jobs:
             --confirm
 
       # ─────────────────────────────────────────────────────────
-      # Stage 3: Source Scout — discover new info sources daily
+      # Stage 3: Source Scout + Auto-Admit
       #
-      # Runs after publish so it uses today's curated items for
-      # content-link diffusion. Output is saved for human review;
-      # sources are NOT auto-committed to the config.
+      # Runs after publish so content-link diffusion has today's
+      # collected items as seeds. Uses deepseek-chat (non-reasoning)
+      # for LLM discovery. Auto-admits new sources at low weight
+      # into a separate auto_sources.yaml.
       # ─────────────────────────────────────────────────────────
       - name: Discover new sources (scout)
         if: ${{ inputs.dry_run != 'true' }}
@@ -113,10 +114,20 @@ jobs:
           python -m agent.cli scout \
             --topic broad \
             --provider deepseek \
+            --model deepseek-chat \
             --run-id "${{ steps.date.outputs.date }}" \
             --json \
             > "artifacts/reports/scout_${{ steps.date.outputs.date }}.json" || true
-          echo "Scout report saved to artifacts/reports/scout_${{ steps.date.outputs.date }}.json"
+          echo "Scout report saved."
+
+      - name: Auto-admit discovered sources
+        if: ${{ inputs.dry_run != 'true' }}
+        run: |
+          echo "=== Auto-admit preview ==="
+          python -m agent.cli admit-sources \
+            --scout-report "artifacts/reports/scout_${{ steps.date.outputs.date }}.json" \
+            --dry-run 2>&1 || true
+          echo "=== Run with --confirm to actually add sources ==="
 
       - name: Install Chinese fonts + Playwright browser
         if: ${{ inputs.dry_run != 'true' }}

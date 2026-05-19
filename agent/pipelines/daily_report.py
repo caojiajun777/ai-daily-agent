@@ -291,6 +291,16 @@ def run_pipeline(
         s.meta["raw_item_count"] = len(raw)
         s.mark_ok()
         tracer.log_stage("collect", "ok", count=len(raw))
+
+        # Save raw items for downstream scout/content-link diffusion.
+        _collected_dir = os.path.join(artifacts_root, "collected")
+        os.makedirs(_collected_dir, exist_ok=True)
+        _raw_path = os.path.join(_collected_dir, f"{date}.json")
+        try:
+            with open(_raw_path, "w", encoding="utf-8") as _f:
+                json.dump([it.to_dict() for it in raw], _f, ensure_ascii=False)
+        except Exception:
+            pass  # non-critical: scout can fall back to curated items
     except Exception as e:
         s.mark_failed(str(e))
         tracer.log_stage("collect", "failed", error=str(e))

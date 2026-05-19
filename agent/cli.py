@@ -339,17 +339,25 @@ def cmd_scout(args: argparse.Namespace) -> int:
         return 3
 
     # Load collected items from a prior run if requested.
+    # Prefer raw collected items (all sources, full URLs) over curated (16-22 items).
     collected = None
     if args.run_id:
+        import json as _json
+        raw_path = os.path.join(args.artifacts or "artifacts", "collected", f"{args.run_id}.json")
         curated_path = os.path.join(args.artifacts or "artifacts", "curated", f"{args.run_id}.json")
-        if os.path.exists(curated_path):
-            try:
-                import json as _json
-                with open(curated_path, "r", encoding="utf-8") as f:
-                    curated_data = _json.load(f)
-                collected = curated_data.get("items", [])
-            except Exception as e:
-                print(f"warning: failed to load curated items: {e}", file=sys.stderr)
+        for path in [raw_path, curated_path]:
+            if os.path.exists(path):
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        data = _json.load(f)
+                    if isinstance(data, list):
+                        collected = data  # raw items: list of dicts
+                    else:
+                        collected = data.get("items", [])  # curated: dict with items key
+                    if collected:
+                        break
+                except Exception as e:
+                    print(f"warning: failed to load items from {path}: {e}", file=sys.stderr)
 
     from agent.agents.source_scout import scout_sources
 
@@ -491,6 +499,29 @@ def cmd_diffuse(args: argparse.Namespace) -> int:
     if result["content_links"]:
         total += result["content_links"].candidates_passed
     return 0 if total > 0 else 1
+
+
+def cmd_admit_sources(args: argparse.Namespace) -> int:
+    """Auto-admit discovered sources from a scout report into the YAML config."""
+    from agent.tools.auto_admit import auto_admit_from_scout
+
+    config_path = args.config or CFG_PATH
+    result = auto_admit_from_scout(
+        scout_report_path=args.scout_report,
+        config_path=config_path,
+        dry_run=args.dry_run,
+    )
+
+    if args.dry_run:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        status = result.get("status", "error")
+        admitted = result.get("admitted", 0)
+        candidates = result.get("candidates", 0)
+        print(f"admit-sources: {status} | admitted={admitted}/{candidates}")
+        if status == "ok":
+            print(f"  config updated: {config_path}")
+    return 0 if result.get("status") in ("ok", "dry_run", "skipped") else 1
 
 
 def cmd_send(args: argparse.Namespace) -> int:
@@ -709,7 +740,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--provider", default=None,
         help="LLM provider for the semantic discovery channel (default: config or mock)",
     )
-    p_scout.add_argument("--model", default=None)
+    p_scout.add_argument("--model", default="deepseek-chat",
+                         help="LLM model (default: deepseek-chat, non-reasoning)")
     p_scout.add_argument("--config", default=None)
     p_scout.add_argument("--artifacts", default="artifacts")
     p_scout.add_argument(
@@ -728,6 +760,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true", help="machine-readable output"
     )
     p_scout.set_defaults(func=cmd_scout)
+
+    p_admit = sub.add_parser(
+        "admit-sources",
+        help="auto-admit discovered sources from scout report into config",
+    )
+    p_admit.add_argument(
+        "--scout-report", required=True,
+        help="path to scout report JSON (e.g. artifacts/reports/scout_2026-05-19.json)",
+    )
+    p_admit.add_argument("--config", default=None)
+    p_admit.add_argument(
+        "--dry-run", action="store_true",
+        help="preview only, do not modify config",
+    )
+    p_admit.set_defaults(func=cmd_admit_sources)
 
     p_diffuse = sub.add_parser(
         "diffuse",
