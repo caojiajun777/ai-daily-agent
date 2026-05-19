@@ -206,6 +206,15 @@ def run_research_editor(
 
         # Parse + validate.
         output = _parse_and_validate(response.text, events)
+        if tracer:
+            tracer.log(
+                "editor_parse_result",
+                raw_len=len(response.text),
+                raw_preview=response.text[:200],
+                selected_count=len([d for d in output.selected if d.decision == "select"]),
+                rejected_count=len(output.rejected),
+                notes=(output.notes or "")[:300],
+            )
 
     except Exception as e:
         if tracer:
