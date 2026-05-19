@@ -182,12 +182,12 @@ def render_markdown(draft: Draft) -> str:
 
 
 _SECTION_SUBTITLES: Dict[str, str] = {
-    "要闻": "Top News",
-    "模型发布": "Model Releases",
-    "开发生态": "Developer Ecosystem",
-    "产品应用": "Products & Applications",
-    "技术与洞察": "Research & Insights",
-    "行业动态": "Industry",
+    "今日头条": "Headlines",
+    "模型前沿": "Model Frontier",
+    "工具与开源": "Tools & Open Source",
+    "论文精选": "Paper Picks",
+    "产品落地": "Launchpad",
+    "业界风向": "Industry Watch",
 }
 
 

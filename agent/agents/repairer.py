@@ -49,7 +49,7 @@ _SYSTEM = """\
 
 规则：
 1. 只处理 severity=high 或 severity=medium 的重复对。
-2. 优先保留"要闻"section 中的条目；删除或替换重复对中排名靠后 section 的条目。
+2. 优先保留"今日头条"section 中的条目；删除或替换重复对中排名靠后 section 的条目。
 3. 被删除的条目，必须从下面提供的"候选替换条目"中选一个替换，以维持 section 不空。
    如果候选为空，则可以省略 replacement_url/replacement_title（表示直接删除）。
 4. 绝对禁止编造 URL —— replacement_url 必须来自"候选替换条目"列表，不得修改。

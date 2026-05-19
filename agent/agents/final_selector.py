@@ -92,19 +92,18 @@ def select_final_items(
     final_ids: List[str] = []
     section_counts: Counter = Counter()
     source_counts: Counter = Counter()
-    # Preferred section distribution for 6 sections.
     section_caps: Dict[str, int] = {
-        "要闻": 3, "模型发布": 4, "开发生态": 4,
-        "产品应用": 4, "技术与洞察": 4, "行业动态": 4,
+        "今日头条": 3, "模型前沿": 4, "工具与开源": 3,
+        "论文精选": 5, "产品落地": 3, "业界风向": 4,
     }
-    section_order = ["要闻", "模型发布", "开发生态", "产品应用", "技术与洞察", "行业动态"]
+    section_order = ["今日头条", "模型前沿", "工具与开源", "论文精选", "产品落地", "业界风向"]
 
     # First pass: must_include always in.
     for eid in sorted_ids:
         d = all_decisions[eid]
         if d.priority == "must_include":
             final_ids.append(eid)
-            section_counts[d.section or "技术与洞察"] += 1
+            section_counts[d.section or "业界风向"] += 1
 
     # Second pass: fill by priority, respecting caps.
     for eid in sorted_ids:
@@ -114,7 +113,7 @@ def select_final_items(
         if d.priority == "must_include":
             continue
 
-        sec = d.section or "技术与洞察"
+        sec = d.section or "业界风向"
 
         # Section cap check.
         cap = section_caps.get(sec, 4)
@@ -245,21 +244,27 @@ def select_final_items(
 
 
 def _guess_section(evt: EventCluster) -> str:
-    """Guess section from event content."""
+    """Guess section from event content — v2.2 six-section layout."""
     text = (evt.canonical_title + " " + evt.summary).lower()
+    # Paper detection: arxiv source or paper keywords — always papers
+    if any(t == "arxiv" for t in evt.source_types) or any(
+        k in text for k in ["论文", "arxiv", "paper", "researchers", "研究团队",
+                            "neurlps", "icml", "iclr", "cvpr", "emnlp", "aaai"]):
+        return "论文精选"
     if any(k in text for k in ["融资", "funding", "ipo", "收购", "裁员", "政策", "监管",
-                                 "regulation", "law", "ban", "hire", "ceo", "executive"]):
-        return "行业动态"
-    if any(k in text for k in ["论文", "research", "arxiv", "study", "paper", "researchers",
-                                 "science", "protein", "数学", "physics"]):
-        return "技术与洞察"
+                                 "regulation", "law", "ban", "hire", "ceo", "executive",
+                                 "partnership", "合作", "投资", "估值"]):
+        return "业界风向"
     if any(k in text for k in ["framework", "sdk", "tool", "library", "github", "开源",
-                                 "api", "cli", "plugin", "extension", "vscode", "copilot"]):
-        return "开发生态"
-    if any(k in text for k in ["app", "product", "feature", "launch", "release", "beta",
-                                 "chatbot", "assistant", "功能", "应用", "产品", "更新"]):
-        return "产品应用"
+                                 "api", "cli", "plugin", "extension", "vscode", "copilot",
+                                 "降价", "定价", "免费", "open source"]):
+        return "工具与开源"
+    # Model before product — model keywords are more specific
     if any(k in text for k in ["model", "模型", "gpt", "claude", "gemini", "parameters",
-                                 "benchmark", "eval", "llm", "diffusion", "语音"]):
-        return "模型发布"
-    return "要闻"
+                                 "benchmark", "eval", "llm", "diffusion", "语音",
+                                 "开源模型", "architecture", "training", "推理"]):
+        return "模型前沿"
+    if any(k in text for k in ["app", "product", "chatbot", "assistant", "功能", "应用",
+                                 "产品", "用户", "推出", "上线", "launch", "feature", "更新"]):
+        return "产品落地"
+    return "业界风向"

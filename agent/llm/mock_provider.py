@@ -68,7 +68,7 @@ def _default_responder(messages: List[LLMMessage]) -> str:
         src = sources[i % len(sources)] if sources else "mock"
         return {"title": f"#{i+1} {title[:40]}", "summary": f"mock summary {i+1}", "url": url, "source": src}
 
-    section_names = ["要闻", "模型发布", "开发生态", "产品应用", "技术与洞察", "行业动态"]
+    section_names = ["今日头条", "模型前沿", "工具与开源", "论文精选", "产品落地", "业界风向"]
     counter = [0]
 
     def _section(name: str) -> dict:
