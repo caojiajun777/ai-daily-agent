@@ -420,9 +420,22 @@ def run_pipeline(
     tracer.log_stage("write", "running")
     draft: Optional[Draft] = None
     curated_path: Optional[str] = None
+    # Use a non-reasoning model for structured JSON generation.
+    write_provider = provider
+    if provider.name == "deepseek":
+        try:
+            from agent.llm.factory import build_provider
+            write_provider = build_provider(
+                "deepseek", model="deepseek-chat",
+                skip_model_check=True,
+                request_timeout_s=60,
+            )
+            tracer.log("writer_model_switch", from_model=provider.model, to_model="deepseek-chat")
+        except Exception as e:
+            tracer.log("writer_model_switch_failed", error=str(e))
     try:
         draft = write_draft(
-            provider=provider,
+            provider=write_provider,
             items=curated,
             date=date,
             system_prompt=prompts["writer_system"],
