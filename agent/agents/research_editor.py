@@ -225,17 +225,29 @@ def _parse_and_validate(
     valid_event_ids = {e.event_id for e in events}
     event_urls = {e.event_id: set(e.source_urls) for e in events}
 
-    # Strip think blocks / fences.
+    # Strip think blocks / fences / conversational prefixes.
     raw = raw_text.strip()
     raw = _re.sub(r"<think>[\s\S]*?</think>", "", raw, flags=_re.IGNORECASE).strip()
     m = _re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
     if m:
         raw = m.group(1).strip()
 
-    # Try to parse JSON.
+    # Try to parse JSON. If it fails, try extracting from { ... } brackets
+    # (deepseek-chat often adds conversational text around the JSON).
+    payload = None
     try:
         payload = _json.loads(raw)
     except _json.JSONDecodeError:
+        # Extract JSON object from between outermost { and }.
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start != -1 and end != -1 and start < end:
+            try:
+                payload = _json.loads(raw[start:end + 1])
+            except _json.JSONDecodeError:
+                pass
+
+    if payload is None:
         return ResearchEditorOutput(notes="JSON parse failed")
 
     if not isinstance(payload, dict):

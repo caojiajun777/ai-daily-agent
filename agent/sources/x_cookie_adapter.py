@@ -123,6 +123,9 @@ def _extract_tweets_from_html(
     link_pattern = re.compile(
         rf'/{re.escape(username)}/status/(\d+)'
     )
+    time_pattern = re.compile(
+        r'<time[^>]*datetime="([^"]+)"'
+    )
 
     for m in tweet_pattern.finditer(html):
         text = _strip_html(m.group(1)).strip()
@@ -133,11 +136,11 @@ def _extract_tweets_from_html(
         title = text.split("\n")[0].strip()[:120]
         cleaned = _clean_tweet_text(text)
 
-        # Search for the tweet permalink near this text block.
-        # Look in a window of surrounding HTML for the status link.
-        match_start = max(0, m.start() - 2000)
-        match_end = min(len(html), m.end() + 500)
+        # Search for the tweet permalink and timestamp near this text block.
+        match_start = max(0, m.start() - 3000)
+        match_end = min(len(html), m.end() + 1000)
         surrounding = html[match_start:match_end]
+
         link_match = link_pattern.search(surrounding)
         tweet_url = (
             f"https://x.com/{username}/status/{link_match.group(1)}"
@@ -145,13 +148,28 @@ def _extract_tweets_from_html(
             else f"https://x.com/{username}"
         )
 
+        # Extract real tweet timestamp from <time> element.
+        time_match = time_pattern.search(surrounding)
+        if time_match:
+            try:
+                ts = datetime.fromisoformat(
+                    time_match.group(1).replace("Z", "+00:00")
+                )
+                published = ts.isoformat()
+                if ts < cutoff:
+                    continue  # too old, skip this tweet
+            except Exception:
+                published = datetime.now(timezone.utc).isoformat()
+        else:
+            published = datetime.now(timezone.utc).isoformat()
+
         items.append(RawItem(
             source_id=source_id,
             source_type="x_cookie",
             title=title,
             url=tweet_url,
             summary=cleaned[:800],
-            published_at=datetime.now(timezone.utc).isoformat(),
+            published_at=published,
             author=f"@{username}",
             tags=[f"x-{account_type}"],
         ))
