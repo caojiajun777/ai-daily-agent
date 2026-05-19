@@ -115,7 +115,8 @@ jobs:
           python -m agent.cli scout \
             --topic broad \
             --provider deepseek \
-            --model deepseek-chat \
+            --model deepseek-v4-flash \
+            --skip-model-check \
             --run-id "${{ steps.date.outputs.date }}" \
             --json \
             > "artifacts/reports/scout_${{ steps.date.outputs.date }}.json" || true

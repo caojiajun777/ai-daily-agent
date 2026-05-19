@@ -334,7 +334,10 @@ def cmd_scout(args: argparse.Namespace) -> int:
     model = args.model or cfg.get("llm", {}).get("default_model")
 
     try:
-        provider = build_provider(provider_name, model=model)
+        kwargs = {}
+        if args.skip_model_check:
+            kwargs["skip_model_check"] = True
+        provider = build_provider(provider_name, model=model, **kwargs)
     except Exception as e:
         print(f"failed to build provider: {e}", file=sys.stderr)
         return 3
@@ -763,6 +766,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_scout.add_argument(
         "--json", action="store_true", help="machine-readable output"
+    )
+    p_scout.add_argument(
+        "--skip-model-check", action="store_true",
+        help="skip model list validation (for custom API gateways)"
     )
     p_scout.set_defaults(func=cmd_scout)
 
