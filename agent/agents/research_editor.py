@@ -210,7 +210,8 @@ def run_research_editor(
             tracer.log(
                 "editor_parse_result",
                 raw_len=len(response.text),
-                raw_preview=response.text[:200],
+                raw_preview=response.text[:300],
+                raw_suffix=response.text[-300:],
                 selected_count=len([d for d in output.selected if d.decision == "select"]),
                 rejected_count=len(output.rejected),
                 notes=(output.notes or "")[:300],
@@ -244,20 +245,24 @@ def _parse_and_validate(
     # Try to parse JSON. If it fails, try extracting from { ... } brackets
     # (deepseek-chat often adds conversational text around the JSON).
     payload = None
+    parse_error = ""
     try:
         payload = _json.loads(raw)
-    except _json.JSONDecodeError:
+    except _json.JSONDecodeError as e:
+        parse_error = f"direct_parse_at_{e.pos}: {raw[e.pos-20:e.pos+20] if e.pos < len(raw) else 'EOF'}"
         # Extract JSON object from between outermost { and }.
         start = raw.find("{")
         end = raw.rfind("}")
         if start != -1 and end != -1 and start < end:
             try:
                 payload = _json.loads(raw[start:end + 1])
-            except _json.JSONDecodeError:
-                pass
+            except _json.JSONDecodeError as e2:
+                parse_error += f" | bracket_parse_at_{e2.pos}: {raw[start:end+1][e2.pos-20:e2.pos+20] if e2.pos < len(raw[start:end+1]) else 'EOF'}"
+                offset = start + e2.pos
+                parse_error += f" | around_offset_{offset}: {raw[offset-30:offset+30]}"
 
     if payload is None:
-        return ResearchEditorOutput(notes="JSON parse failed")
+        return ResearchEditorOutput(notes=f"JSON parse failed: {parse_error}")
 
     if not isinstance(payload, dict):
         return ResearchEditorOutput(notes="Not a dict")
