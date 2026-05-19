@@ -119,11 +119,25 @@ def _run_research_editor_flow(
         evidence_list = []
 
     # 5. Research Editor (LLM).
+    # Use a non-reasoning model for structured editorial decisions.
+    # deepseek-v4-pro (reasoning) consistently selects 0 items because it
+    # "overthinks" and produces minimal output. deepseek-chat handles
+    # structured JSON generation reliably.
+    editor_provider = provider
+    if provider.name == "deepseek":
+        try:
+            from agent.llm.factory import build_provider
+            editor_provider = build_provider("deepseek", model="deepseek-chat",
+                                             skip_model_check=True,
+                                             request_timeout_s=llm_timeout)
+        except Exception:
+            pass  # fall back to the default provider
+
     editor_output = run_research_editor(
         events=events,
         evidence=evidence_list if evidence_list else None,
         history_titles=history_titles,
-        provider=provider,
+        provider=editor_provider,
         tracer=tracer,
         budget=budget,
         timeout_sec=llm_timeout,

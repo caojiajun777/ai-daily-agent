@@ -173,12 +173,25 @@ def test_validate_rss_bogus_url():
     assert not c.reachable
 
 
-def test_validate_rss_real_feed():
-    """Validate against a known real RSS feed (HuggingFace blog)."""
+def test_validate_rss_real_feed(tmp_path):
+    """Validate against a local RSS feed (offline-safe)."""
+    rss_xml = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<rss version=\"2.0\"><channel><title>Test Blog</title>
+<link>https://example.com</link>
+<item><title>AI research paper</title><link>https://example.com/1</link>
+<description>New deep learning method</description>
+<pubDate>Mon, 19 May 2026 10:00:00 GMT</pubDate></item>
+<item><title>Model release</title><link>https://example.com/2</link>
+<description>Open source LLM released</description>
+<pubDate>Mon, 19 May 2026 09:00:00 GMT</pubDate></item>
+</channel></rss>"""
+    feed_path = tmp_path / "test_feed.xml"
+    feed_path.write_text(rss_xml, encoding="utf-8")
+
     c = CandidateSource(
-        name="HuggingFace Blog",
+        name="Test Blog",
         source_type="rss",
-        url="https://huggingface.co/blog/feed.xml",
+        url=str(feed_path),
     )
     _validate_rss(c)
     assert c.reachable

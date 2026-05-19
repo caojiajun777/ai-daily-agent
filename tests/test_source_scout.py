@@ -131,11 +131,31 @@ def scout_config(tmp_path):
     return str(config)
 
 
-def test_scout_basic(scout_provider, scout_config):
+def test_scout_basic(scout_provider, scout_config, tmp_path):
     """Scout with just LLM channel (no collected items)."""
+    # Write a local RSS file so validation passes without network.
+    rss_xml = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<rss version=\"2.0\"><channel><title>AI Research Weekly</title>
+<link>https://example.com</link>
+<item><title>Test paper</title><link>https://example.com/1</link>
+<description>AI breakthrough</description>
+<pubDate>Mon, 19 May 2026 10:00:00 GMT</pubDate></item>
+</channel></rss>"""
+    local_rss = tmp_path / "ai_research_feed.xml"
+    local_rss.write_text(rss_xml, encoding="utf-8")
+
+    # Override mock candidate URL to use local file.
+    candidates = json.loads(_candidate_response)
+    candidates[0]["url"] = str(local_rss)
+
+    def responder(messages):
+        return json.dumps(candidates)
+    from agent.llm.mock_provider import MockLLMProvider
+    provider = MockLLMProvider(model="mock-scout", responder=responder)
+
     report = scout_sources(
         topic="broad",
-        provider=scout_provider,
+        provider=provider,
         config_path=scout_config,
         collected_items=None,
         max_per_channel=8,
@@ -143,7 +163,6 @@ def test_scout_basic(scout_provider, scout_config):
     assert isinstance(report, ScoutReport)
     assert "llm" in report.channels_used
     assert report.candidates_total >= 0
-    # The real HF feed should pass.
     passed_names = [c.name for c in report.passed]
     assert any("AI Research" in n for n in passed_names)
 

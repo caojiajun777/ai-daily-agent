@@ -113,9 +113,15 @@ def _extract_tweets_from_html(
     items: List[RawItem] = []
     seen: set = set()
 
+    # Extract tweet text blocks with surrounding link context.
+    # Twitter renders tweets in <article> elements with data-testid="tweet".
+    # Each tweet contains a permalink: /{username}/status/{tweet_id}
     tweet_pattern = re.compile(
         r'data-testid="tweetText"[^>]*>(.*?)</div>',
         re.DOTALL,
+    )
+    link_pattern = re.compile(
+        rf'/{re.escape(username)}/status/(\d+)'
     )
 
     for m in tweet_pattern.finditer(html):
@@ -127,11 +133,23 @@ def _extract_tweets_from_html(
         title = text.split("\n")[0].strip()[:120]
         cleaned = _clean_tweet_text(text)
 
+        # Search for the tweet permalink near this text block.
+        # Look in a window of surrounding HTML for the status link.
+        match_start = max(0, m.start() - 2000)
+        match_end = min(len(html), m.end() + 500)
+        surrounding = html[match_start:match_end]
+        link_match = link_pattern.search(surrounding)
+        tweet_url = (
+            f"https://x.com/{username}/status/{link_match.group(1)}"
+            if link_match
+            else f"https://x.com/{username}"
+        )
+
         items.append(RawItem(
             source_id=source_id,
             source_type="x_cookie",
             title=title,
-            url=f"https://x.com/{username}",
+            url=tweet_url,
             summary=cleaned[:800],
             published_at=datetime.now(timezone.utc).isoformat(),
             author=f"@{username}",
