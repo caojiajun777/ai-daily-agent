@@ -2,13 +2,13 @@ name: Agent — Daily Run & Publish
 
 # Runs every day at 08:00 Beijing time (UTC 00:00).
 #
-# Token policy: GITHUB_PUBLISH_TOKEN must be the repo owner's PAT.
+# Token policy: PUBLISH_TOKEN must be the repo owner's PAT.
 # Issues created by github-actions[bot] lack proper authorship for audit
 # attribution. GITHUB_TOKEN is explicitly refused by the publisher.
 #
 # Required repository secrets:
 #   DEEPSEEK_API_KEY       — DeepSeek API key for the LLM run
-#   GITHUB_PUBLISH_TOKEN   — Repo owner PAT with issues:write scope
+#   PUBLISH_TOKEN   — Repo owner PAT with issues:write scope
 #   PUBLISH_REPO           — Target repo, e.g. "caojiajun777/ai-daily-agent"
 #   PUBLISH_ISSUE_LABELS   — Comma-separated labels, e.g. "ai-daily,agent-generated"
 #   X_BEARER_TOKEN         — (optional) X API v2 Bearer Token for social-graph diffusion
@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-      GITHUB_PUBLISH_TOKEN: ${{ secrets.GITHUB_PUBLISH_TOKEN }}
+      GITHUB_PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
       PUBLISH_REPO: ${{ secrets.PUBLISH_REPO }}
       PUBLISH_ISSUE_LABELS: ${{ secrets.PUBLISH_ISSUE_LABELS }}
       X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
@@ -51,13 +51,6 @@ jobs:
       EMAIL_SUBSCRIBERS: ${{ secrets.EMAIL_SUBSCRIBERS }}
 
     steps:
-      - name: Refuse to run without owner PAT
-        if: ${{ env.GITHUB_PUBLISH_TOKEN == '' }}
-        run: |
-          echo "::error::GITHUB_PUBLISH_TOKEN secret is not set."
-          echo "Issues must be created with the repo owner's PAT, not GITHUB_TOKEN."
-          exit 1
-
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -124,6 +117,12 @@ jobs:
             --json \
             > "artifacts/reports/scout_${{ steps.date.outputs.date }}.json" || true
           echo "Scout report saved to artifacts/reports/scout_${{ steps.date.outputs.date }}.json"
+
+      - name: Install Chinese fonts + Playwright browser
+        if: ${{ inputs.dry_run != 'true' }}
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk
+          python -m playwright install chromium
 
       - name: Send PDF via email
         if: ${{ inputs.dry_run != 'true' }}
