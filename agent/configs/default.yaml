@@ -20,6 +20,34 @@ budget:
   max_total_output_tokens: 30000
   max_total_calls: 40
   hard_fail_on_exceed: true
+  # Token Budget Policy: prevent source expansion from exploding LLM tokens
+  max_total_context_tokens: 8000
+  max_writer_input_tokens: 6000
+  max_writer_output_tokens: 3500
+  max_daily_llm_calls: 8
+  max_daily_estimated_cost_usd: 0.05
+
+token_budget:
+  max_raw_items_per_run: 800
+  max_candidates_after_filter: 120
+  max_clusters_after_dedup: 60
+  max_writer_items: 18
+  max_items_per_section: 4
+  max_snippet_chars: 500
+  budget_overflow_drop_order:
+    - community_signal
+    - market_commentary
+    - vc_signal
+    - cn_aggregator
+    - tech_media
+    - insider_reporter_signal
+  budget_overflow_keep:
+    - official_release
+    - pricing_page
+    - benchmark_tracker
+    - research_paper
+    - china_model_official
+    - china_model_pricing
 
 context:
   max_messages_keep: 20
@@ -33,6 +61,98 @@ eval:
     - "I cannot"
     - "Lorem ipsum"
 
+content_types:
+  # ── Official sources ──
+  official_release:
+    source_weight: 1.35
+    half_life_h: 48
+  official_docs:
+    source_weight: 1.35
+    half_life_h: 168
+  pricing_page:
+    source_weight: 1.35
+    half_life_h: 168
+  # ── Research ──
+  research_paper:
+    source_weight: 1.05
+    half_life_h: 120
+  github_release:
+    source_weight: 0.95
+    half_life_h: 72
+  # ── China model vendors ──
+  china_model_official:
+    source_weight: 1.25
+    half_life_h: 48
+  china_model_docs:
+    source_weight: 1.30
+    half_life_h: 168
+  china_model_pricing:
+    source_weight: 1.35
+    half_life_h: 168
+  china_product_changelog:
+    source_weight: 1.00
+    half_life_h: 72
+  china_ecosystem_signal:
+    source_weight: 0.80
+    half_life_h: 48
+  # ── Benchmark & Product ──
+  benchmark_tracker:
+    source_weight: 1.20
+    half_life_h: 72
+  product_changelog:
+    source_weight: 1.00
+    half_life_h: 72
+  # ── Infra & Finance ──
+  infra_signal:
+    source_weight: 1.10
+    half_life_h: 120
+  financial_report:
+    source_weight: 1.30
+    half_life_h: 120
+  # ── People signals ──
+  founder_signal:
+    source_weight: 1.00
+    half_life_h: 36
+  researcher_signal:
+    source_weight: 0.95
+    half_life_h: 72
+  expert_signal:
+    source_weight: 0.90
+    half_life_h: 72
+  expert_newsletter:
+    source_weight: 0.90
+    half_life_h: 96
+  builder_signal:
+    source_weight: 0.90
+    half_life_h: 72
+  # ── Insider & VC ──
+  insider_media:
+    source_weight: 1.05
+    half_life_h: 72
+  insider_reporter_signal:
+    source_weight: 0.95
+    half_life_h: 36
+  vc_signal:
+    source_weight: 0.80
+    half_life_h: 36
+  # ── Safety ──
+  safety_eval:
+    source_weight: 1.00
+    half_life_h: 120
+  # ── Media & Community ──
+  tech_media:
+    source_weight: 0.85
+    half_life_h: 36
+  cn_aggregator:
+    source_weight: 0.65
+    half_life_h: 36
+  community_signal:
+    source_weight: 0.75
+    half_life_h: 24
+  market_commentary:
+    source_weight: 0.65
+    half_life_h: 24
+
 curation:
   mode: "research_editor"   # rules_only | research_editor | legacy_llm_scoring
   candidate_top_k: 40
@@ -44,6 +164,12 @@ curation:
   enable_evidence_fetch: false   # off by default — adds ~20s per run
   evidence_fetch_timeout_sec: 8
   llm_rerank_timeout_sec: 60
+  score_floor: 0.10
+
+section_quotas:
+  research_frontier:
+    min: 2
+    max: 4
 
 publish:
   # Publish gate: a draft must clear ALL of these before an issue is created.
@@ -485,3 +611,309 @@ sources:
     url: "https://jack-clark.net/feed/"
     weight: 0.9
     max_items: 5
+
+  # ═══════════════════════════════════════════════════════════════
+  # v3: China Model Vendor Sources — official, docs, pricing, repos
+  # ═══════════════════════════════════════════════════════════════
+
+  # --- DeepSeek / 深度求索 ---
+  - id: "deepseek_pricing"
+    type: "rss"
+    enabled: false
+    url: "https://api-docs.deepseek.com/news"
+    content_type: "china_model_pricing"
+    weight: 1.35
+    half_life_h: 168
+    max_items: 3
+    notes: "stub: needs http_snapshot adapter for pricing page"
+
+  - id: "deepseek_github_releases"
+    type: "rss"
+    enabled: false
+    url: "https://github.com/deepseek-ai/DeepSeek-V3/releases.atom"
+    content_type: "github_release"
+    weight: 1.05
+    half_life_h: 72
+    max_items: 5
+
+  # --- Alibaba Qwen / 通义千问 ---
+  - id: "qwen_github_releases"
+    type: "rss"
+    enabled: false
+    url: "https://github.com/QwenLM/Qwen3/releases.atom"
+    content_type: "github_release"
+    weight: 1.05
+    half_life_h: 72
+    max_items: 5
+
+  - id: "qwen_modelscope"
+    type: "rss"
+    enabled: false
+    url: "https://modelscope.cn/models/Qwen/rss"
+    content_type: "china_ecosystem_signal"
+    weight: 0.80
+    half_life_h: 48
+    max_items: 5
+
+  # --- ByteDance Doubao / 火山方舟 ---
+  - id: "volcengine_ark_docs"
+    type: "rss"
+    enabled: false
+    content_type: "china_model_docs"
+    weight: 1.30
+    half_life_h: 168
+    max_items: 3
+    notes: "stub: needs http_snapshot for ark docs changelog"
+
+  # --- Moonshot / Kimi / 月之暗面 ---
+  - id: "moonshot_api_docs"
+    type: "rss"
+    enabled: false
+    content_type: "china_model_docs"
+    weight: 1.30
+    half_life_h: 168
+    max_items: 3
+
+  # --- Zhipu / 智谱 ---
+  - id: "bigmodel_docs"
+    type: "rss"
+    enabled: false
+    content_type: "china_model_docs"
+    weight: 1.30
+    half_life_h: 168
+    max_items: 3
+
+  # --- Baidu ERNIE / 千帆 ---
+  - id: "baidu_qianfan_docs"
+    type: "rss"
+    enabled: false
+    content_type: "china_model_docs"
+    weight: 1.30
+    half_life_h: 168
+    max_items: 3
+
+  # --- Tencent Hunyuan ---
+  - id: "tencent_hunyuan_docs"
+    type: "rss"
+    enabled: false
+    content_type: "china_model_docs"
+    weight: 1.30
+    half_life_h: 168
+    max_items: 3
+
+  # --- 01.AI / Yi ---
+  - id: "zeroone_api_docs"
+    type: "rss"
+    enabled: false
+    content_type: "china_model_docs"
+    weight: 1.30
+    half_life_h: 168
+    max_items: 3
+
+  # --- Baichuan ---
+  - id: "baichuan_api_docs"
+    type: "rss"
+    enabled: false
+    content_type: "china_model_docs"
+    weight: 1.30
+    half_life_h: 168
+    max_items: 3
+
+  # --- SiliconFlow / 硅基流动 ---
+  - id: "siliconflow_docs"
+    type: "rss"
+    enabled: false
+    content_type: "china_ecosystem_signal"
+    weight: 0.80
+    half_life_h: 48
+    max_items: 3
+
+  # --- ModelScope ---
+  - id: "modelscope_trending"
+    type: "rss"
+    enabled: false
+    content_type: "china_ecosystem_signal"
+    weight: 0.80
+    half_life_h: 48
+    max_items: 5
+    notes: "stub: needs custom scraper for modelscope trending"
+
+  # ═══════════════════════════════════════════════════════════════
+  # v3: International Benchmark, Pricing, Infra Sources
+  # ═══════════════════════════════════════════════════════════════
+
+  - id: "artificial_analysis"
+    type: "rss"
+    enabled: false
+    content_type: "benchmark_tracker"
+    weight: 1.20
+    half_life_h: 72
+    max_items: 3
+    notes: "stub: needs http_snapshot for model performance/price leaderboard"
+
+  - id: "lmarena_leaderboard"
+    type: "rss"
+    enabled: false
+    content_type: "benchmark_tracker"
+    weight: 1.20
+    half_life_h: 72
+    max_items: 3
+    notes: "stub: LMSYS Chatbot Arena"
+
+  - id: "livebench"
+    type: "rss"
+    enabled: false
+    content_type: "benchmark_tracker"
+    weight: 1.20
+    half_life_h: 72
+    max_items: 3
+    notes: "stub: livebench.ai"
+
+  - id: "openrouter_models_pricing"
+    type: "rss"
+    enabled: false
+    content_type: "pricing_page"
+    weight: 1.20
+    half_life_h: 168
+    max_items: 3
+    notes: "stub: openrouter.ai/models — aggregate pricing API"
+
+  - id: "nvidia_technical_blog"
+    type: "rss"
+    url: "https://developer.nvidia.com/blog/feed/"
+    content_type: "infra_signal"
+    weight: 1.10
+    half_life_h: 120
+    max_items: 5
+
+  - id: "vllm_releases"
+    type: "rss"
+    enabled: false
+    url: "https://github.com/vllm-project/vllm/releases.atom"
+    content_type: "infra_signal"
+    weight: 0.90
+    half_life_h: 72
+    max_items: 3
+
+  - id: "ollama_releases"
+    type: "rss"
+    enabled: false
+    url: "https://github.com/ollama/ollama/releases.atom"
+    content_type: "infra_signal"
+    weight: 0.80
+    half_life_h: 72
+    max_items: 3
+
+  # ═══════════════════════════════════════════════════════════════
+  # v3: Silicon Valley Insider, VC, Builder Signal Sources
+  # ═══════════════════════════════════════════════════════════════
+
+  # Insider media (enabled=false until adapter verified)
+  - id: "the_information_ai"
+    type: "rss"
+    enabled: false
+    url: "https://www.theinformation.com/feed"
+    content_type: "insider_media"
+    weight: 1.05
+    half_life_h: 72
+    max_items: 5
+    notes: "paywalled; use snippet_only parser"
+
+  - id: "bloomberg_ai"
+    type: "rss"
+    enabled: false
+    url: "https://feeds.bloomberg.com/technology/ai.xml"
+    content_type: "insider_media"
+    weight: 1.05
+    half_life_h: 72
+    max_items: 5
+
+  - id: "axios_ai"
+    type: "rss"
+    enabled: false
+    url: "https://www.axios.com/feeds/ai-future.xml"
+    content_type: "insider_media"
+    weight: 1.00
+    half_life_h: 72
+    max_items: 5
+
+  # VC signal (X accounts, enabled=false until handle verified)
+  - id: "vc_a16z_ai"
+    type: "x_cookie"
+    enabled: false
+    username: "a16z"
+    account_type: "vc"
+    content_type: "vc_signal"
+    weight: 0.80
+    half_life_h: 36
+    max_items: 3
+    notes: "do not treat as investment advice"
+
+  - id: "vc_sequoia_ai"
+    type: "x_cookie"
+    enabled: false
+    username: "sequoia"
+    account_type: "vc"
+    content_type: "vc_signal"
+    weight: 0.80
+    half_life_h: 36
+    max_items: 3
+
+  # Builder signal (X accounts)
+  - id: "builder_swyx"
+    type: "x_cookie"
+    enabled: false
+    username: "swyx"
+    account_type: "kol"
+    content_type: "builder_signal"
+    weight: 0.90
+    half_life_h: 72
+    max_items: 3
+
+  - id: "builder_lilian_weng"
+    type: "x_cookie"
+    enabled: false
+    username: "lilianweng"
+    account_type: "kol"
+    content_type: "builder_signal"
+    weight: 0.90
+    half_life_h: 72
+    max_items: 3
+
+  # Expert newsletters
+  - id: "latent_space"
+    type: "rss"
+    enabled: false
+    url: "https://www.latent.space/feed"
+    content_type: "expert_newsletter"
+    weight: 0.90
+    half_life_h: 96
+    max_items: 5
+
+  - id: "interconnects"
+    type: "rss"
+    enabled: false
+    url: "https://www.interconnects.ai/feed"
+    content_type: "expert_newsletter"
+    weight: 0.90
+    half_life_h: 96
+    max_items: 5
+
+  # Product changelogs
+  - id: "cursor_changelog"
+    type: "rss"
+    enabled: false
+    url: "https://cursor.com/changelog/rss"
+    content_type: "product_changelog"
+    weight: 1.00
+    half_life_h: 72
+    max_items: 3
+
+  - id: "github_copilot_changelog"
+    type: "rss"
+    enabled: false
+    url: "https://github.blog/changelog/label/copilot/feed/"
+    content_type: "product_changelog"
+    weight: 1.00
+    half_life_h: 72
+    max_items: 3

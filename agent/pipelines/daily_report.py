@@ -340,12 +340,23 @@ def run_pipeline(
     evidence_timeout = float(curation_cfg.get("evidence_fetch_timeout_sec", 8))
     llm_timeout = int(curation_cfg.get("llm_rerank_timeout_sec", 60))
 
+    # Content-type-aware scoring config.
+    content_types_cfg = cfg.get("content_types", {})
+    score_floor = float(curation_cfg.get("score_floor", 0))
+    section_quotas = cfg.get("section_quotas", {})
+    research_min = int(
+        section_quotas.get("research_frontier", {}).get("min", 0)
+    )
+
     try:
         # ── Fallback: rules_only mode ────────────────────────────
         if curation_mode == "rules_only":
             curated, curated_records = curate_with_records(
                 raw, source_specs=sources,
                 max_items=int(run_cfg.get("max_items_curate", 20)),
+                content_types_cfg=content_types_cfg,
+                score_floor=score_floor,
+                research_min=research_min,
             )
 
         # ── Legacy LLM scoring (disabled by default) ─────────────
@@ -356,6 +367,9 @@ def run_pipeline(
                 items=raw, source_specs=sources, provider=provider,
                 max_items=int(run_cfg.get("max_items_curate", 20)),
                 tracer=tracer, budget=budget,
+                content_types_cfg=content_types_cfg,
+                score_floor=score_floor,
+                research_min=research_min,
             )
 
         # ── Research Editor mode (default) ───────────────────────

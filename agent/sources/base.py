@@ -16,6 +16,7 @@ class RawItem:
     published_at: str  # ISO 8601 string, normalized by adapter
     author: str = ""
     tags: List[str] = None  # type: ignore[assignment]
+    content_type: str = "tech_media"  # maps to content_types config key
 
     def __post_init__(self) -> None:
         if self.tags is None:
@@ -31,6 +32,7 @@ class RawItem:
             "published_at": self.published_at,
             "author": self.author,
             "tags": list(self.tags),
+            "content_type": self.content_type,
         }
 
 

@@ -147,7 +147,13 @@ def _norm_title(title: str) -> str:
     return _NORM_RE.sub(" ", title.lower()).strip()
 
 
-def _recency_score(published_at: str, now_ts: float) -> float:
+def _recency_score(published_at: str, now_ts: float, half_life_h: float) -> float:
+    """True exponential decay with configurable half-life.
+
+    recency = exp(-ln(2) * age_h / half_life_h)
+
+    At age = half_life_h the score is exactly 0.5.
+    """
     if not published_at:
         return 0.5
     try:
@@ -155,8 +161,169 @@ def _recency_score(published_at: str, now_ts: float) -> float:
         age_h = max(0.0, (now_ts - dt.timestamp()) / 3600.0)
     except Exception:
         return 0.5
-    # Exponential decay with ~72h half-life.
-    return math.exp(-age_h / 72.0)
+    if half_life_h <= 0:
+        return 1.0
+    return math.exp(-math.log(2) * age_h / half_life_h)
+
+
+# ── Content-type inference from source config ───────────────────────
+# Maps source characteristics to content_types config keys.
+
+_CONTENT_TYPE_RULES: list[tuple[str, str]] = [
+    # (pattern, content_type) — first match wins, patterns against source_id lowercase
+    # ── Papers & Research ──
+    ("arxiv", "research_paper"),
+    ("hf_daily_papers", "research_paper"),
+    ("paperswithcode", "research_paper"),
+    ("_paper", "research_paper"),
+    # ── Pricing & Docs ──
+    ("_pricing", "pricing_page"),
+    ("_api_docs", "official_docs"),
+    ("_docs", "official_docs"),
+    ("modelscope", "china_ecosystem_signal"),
+    # ── Benchmark ──
+    ("_benchmark", "benchmark_tracker"),
+    ("_leaderboard", "benchmark_tracker"),
+    ("livebench", "benchmark_tracker"),
+    ("swebench", "benchmark_tracker"),
+    ("aider_", "benchmark_tracker"),
+    ("lmarena", "benchmark_tracker"),
+    ("artificial_analysis", "benchmark_tracker"),
+    # ── Infra & Financial ──
+    ("_ir", "financial_report"),
+    ("_ir_", "financial_report"),
+    ("nvidia_", "infra_signal"),
+    ("epoch_ai", "infra_signal"),
+    ("semianalysis", "infra_signal"),
+    ("vllm_", "infra_signal"),
+    ("sglang_", "infra_signal"),
+    ("ollama_", "infra_signal"),
+    ("together_ai", "infra_signal"),
+    ("fireworks_ai", "infra_signal"),
+    ("groq_", "infra_signal"),
+    ("cerebras", "infra_signal"),
+    ("modal_blog", "infra_signal"),
+    ("baseten_", "infra_signal"),
+    # ── Insider Media ──
+    ("the_information", "insider_media"),
+    ("bloomberg", "insider_media"),
+    ("wsj_", "insider_media"),
+    ("reuters", "insider_media"),
+    ("axios_", "insider_media"),
+    ("semafor", "insider_media"),
+    ("businessinsider", "insider_media"),
+    ("nytimes", "insider_media"),
+    # ── VC / Founder / Reporter signals ──
+    ("vc_", "vc_signal"),
+    ("reporter_", "insider_reporter_signal"),
+    ("founder_", "founder_signal"),
+    ("x_sama", "founder_signal"),
+    ("x_gdb", "founder_signal"),
+    # ── Researcher & Expert signals ──
+    ("x_karpathy", "researcher_signal"),
+    ("x_ilyasut", "researcher_signal"),
+    ("x_ylecun", "researcher_signal"),
+    ("x_fchollet", "researcher_signal"),
+    ("x_jimfan", "researcher_signal"),
+    ("x_akhaliq", "expert_signal"),
+    ("x_andrewyng", "expert_signal"),
+    # ── Builder signals ──
+    ("x_simonw", "builder_signal"),
+    ("x_tinygrad", "builder_signal"),
+    ("builder_", "builder_signal"),
+    # ── China model vendors ──
+    ("deepseek_", "china_model_official"),
+    ("qwen_", "china_model_official"),
+    ("aliyun_", "china_model_official"),
+    ("zhipu_", "china_model_official"),
+    ("baidu_", "china_model_official"),
+    ("moonshot_", "china_model_official"),
+    ("minimax_", "china_model_official"),
+    ("stepfun_", "china_model_official"),
+    ("zeroone_", "china_model_official"),
+    ("baichuan_", "china_model_official"),
+    ("iflytek_", "china_model_official"),
+    ("sensetime_", "china_model_official"),
+    ("kling_", "china_model_official"),
+    ("x_deepseek", "china_model_official"),
+    ("x_qwen", "china_model_official"),
+    ("x_zhipu", "china_model_official"),
+    ("x_baidu", "china_model_official"),
+    ("x_tencent_hunyuan", "china_model_official"),
+    ("x_alicloud", "china_model_official"),
+    ("x_moonshot", "china_model_official"),
+    ("x_minimax", "china_model_official"),
+    ("x_stepfun", "china_model_official"),
+    ("x_01ai", "china_model_official"),
+    ("x_kuaishou_kling", "china_product_changelog"),
+    ("x_siliconflow", "china_ecosystem_signal"),
+    ("siliconflow_", "china_ecosystem_signal"),
+    ("x_dotey", "china_ecosystem_signal"),
+    ("x_ayi", "china_ecosystem_signal"),
+    ("x_yi_ding", "china_ecosystem_signal"),
+    # ── Product changelog ──
+    ("_changelog", "product_changelog"),
+    ("cursor_", "product_changelog"),
+    ("windsurf_", "product_changelog"),
+    ("copilot_", "product_changelog"),
+    # ── Safety ──
+    ("safety_", "safety_eval"),
+    ("metr_", "safety_eval"),
+    ("apollo_research", "safety_eval"),
+    ("nist_ai", "safety_eval"),
+    ("mlcommons", "safety_eval"),
+    # ── Newsletters ──
+    ("the_batch", "expert_newsletter"),
+    ("import_ai", "expert_newsletter"),
+    ("latent_space", "expert_newsletter"),
+    ("interconnects", "expert_newsletter"),
+    ("stratechery", "expert_newsletter"),
+    # ── CN aggregators ──
+    ("36kr", "cn_aggregator"),
+    ("ithome", "cn_aggregator"),
+    ("jiqizhixin", "cn_aggregator"),
+    ("qbitai", "cn_aggregator"),
+    ("aihot", "cn_aggregator"),
+    # ── Tech media ──
+    ("techcrunch", "tech_media"),
+    ("venturebeat", "tech_media"),
+    ("the_verge", "tech_media"),
+    ("wired", "tech_media"),
+    ("ars_technica", "tech_media"),
+    ("mit_tech_review", "tech_media"),
+    # ── Community ──
+    ("hackernews", "community_signal"),
+    ("reddit_", "community_signal"),
+    ("huggingface_blog", "official_release"),
+]
+
+
+def _infer_content_type(source_id: str, source_type: str) -> str:
+    """Map a source to its content_type using pattern rules."""
+    sid = source_id.lower()
+    for pattern, ct in _CONTENT_TYPE_RULES:
+        if pattern in sid:
+            return ct
+    # Official X accounts → official_release
+    if source_type in ("x", "x_cookie"):
+        return "official_release"
+    # RSS feeds from official domains → official_release
+    return "official_release"
+
+
+def _build_ct_lookup(source_specs: list[dict]) -> dict[str, str]:
+    """Build source_id → content_type lookup from config specs."""
+    lookup: dict[str, str] = {}
+    for spec in source_specs:
+        sid = spec.get("id", "")
+        if not sid:
+            continue
+        # Use explicit content_type from config if present
+        if "content_type" in spec:
+            lookup[sid] = spec["content_type"]
+        else:
+            lookup[sid] = _infer_content_type(sid, spec.get("type", ""))
+    return lookup
 
 
 def _dup_group_id(normalized_title: str) -> str:
@@ -173,10 +340,16 @@ def curate(
     *,
     source_specs: List[Dict[str, Any]],
     max_items: int = 12,
+    content_types_cfg: Dict[str, Any] | None = None,
+    score_floor: float = 0.0,
+    research_min: int = 0,
 ) -> List[CuratedItem]:
     """Return the top-N curated items (writer input contract, unchanged)."""
     curated_items, _ = curate_with_records(
-        items, source_specs=source_specs, max_items=max_items
+        items, source_specs=source_specs, max_items=max_items,
+        content_types_cfg=content_types_cfg,
+        score_floor=score_floor,
+        research_min=research_min,
     )
     return curated_items
 
@@ -186,17 +359,30 @@ def curate_with_records(
     *,
     source_specs: List[Dict[str, Any]],
     max_items: int = 12,
+    content_types_cfg: Dict[str, Any] | None = None,
+    score_floor: float = 0.0,
+    research_min: int = 0,
 ) -> Tuple[List[CuratedItem], List[CuratedItemRecord]]:
     """Return (writer_items, persistence_records).
 
-    ``writer_items`` is the same list ``curate()`` returns — the rest of the
-    pipeline is unaware this function exists.
-    ``persistence_records`` has one entry per *selected* item (used_in_draft=True).
+    Scoring uses content-type-aware weights and half-lives when
+    content_types_cfg is provided, falling back to legacy source_weight.
     """
-    weights: Dict[str, float] = {
+    ct_lookup = _build_ct_lookup(source_specs)
+
+    # Build content-type parameter maps.
+    ct_weights: Dict[str, float] = {}
+    ct_half_lives: Dict[str, float] = {}
+    if content_types_cfg:
+        for ct_key, ct_cfg in content_types_cfg.items():
+            ct_weights[ct_key] = float(ct_cfg.get("source_weight", 0.85))
+            ct_half_lives[ct_key] = float(ct_cfg.get("half_life_h", 48))
+    # Also keep legacy weights for sources without content_type mapping.
+    legacy_weights: Dict[str, float] = {
         s.get("id", ""): float(s.get("weight", 1.0)) for s in source_specs
     }
-    seen_titles: Dict[str, str] = {}   # norm_title → dup_group_id
+
+    seen_titles: Dict[str, str] = {}
     seen_urls: set = set()
     now_ts = _time.time()
 
@@ -218,15 +404,18 @@ def curate_with_records(
         # ── AI-relevance filter ──────────────────────────────────
         rel_boost = _relevance_boost(it.title, it.summary, it.source_id)
         if rel_boost == 0.0:
-            continue  # hard drop: not AI-related at all
+            continue
 
         seen_titles[nt] = _dup_group_id(nt)
         seen_urls.add(it.url)
 
-        w = weights.get(it.source_id, 1.0)
-        r = _recency_score(it.published_at, now_ts)
+        # ── Content-type-aware scoring ───────────────────────────
+        ct = ct_lookup.get(it.source_id, "tech_media")
+        ct_w = ct_weights.get(ct, legacy_weights.get(it.source_id, 1.0))
+        ct_hl = ct_half_lives.get(ct, 48.0)
+        r = _recency_score(it.published_at, now_ts, ct_hl)
 
-        # ── Source diversity: penalize items from over-represented sources ──
+        # ── Source diversity: penalize over-represented sources ──
         source_count = source_scored_count.get(it.source_id, 0)
         diversity_penalty = 1.0
         if source_count >= 6:
@@ -236,13 +425,20 @@ def curate_with_records(
         elif source_count >= 3:
             diversity_penalty = 0.85
 
-        score = w * r * rel_boost * diversity_penalty
+        score = ct_w * r * rel_boost * diversity_penalty
+
+        # ── Soft score floor ─────────────────────────────────────
+        # Fast-news items below floor are discarded. Slow-moving
+        # content types (research, pricing, financial) pass through.
+        if score_floor > 0 and score < score_floor:
+            if ct not in ("research_paper", "pricing_page", "financial_report"):
+                continue
 
         source_scored_count[it.source_id] += 1
 
         reasons: list[str] = []
-        if w != 1.0:
-            reasons.append(f"source_weight={w:.2f}")
+        reasons.append(f"ct={ct}")
+        reasons.append(f"ct_w={ct_w:.2f}")
         reasons.append(f"recency={r:.3f}")
         if rel_boost != 1.0:
             reasons.append(f"relevance={rel_boost:.2f}")
@@ -273,49 +469,64 @@ def curate_with_records(
         scored.append((score, curated, record))
 
     scored.sort(key=lambda x: x[0], reverse=True)
-    top = _select_with_paper_quota(scored, max_items, min_papers=5)
+    top = _select_with_paper_quota(
+        scored, max_items, min_papers=5, research_min=research_min,
+    )
     writer_items = [c for _, c, _ in top]
     records = [rec for _, _, rec in top]
     return writer_items, records
 
 
 _MIN_PAPERS = 5
+_RESEARCH_FLOOR = 0.15  # minimum score for backfilled research papers
+
+
+def _is_research(item: CuratedItemRecord) -> bool:
+    """Check if a curated item is a research paper."""
+    return (
+        "arxiv" in item.source_name.lower()
+        or "hf_daily_papers" in item.source_name.lower()
+    )
 
 
 def _select_with_paper_quota(
     scored: List[Tuple[float, CuratedItem, CuratedItemRecord]],
     max_items: int,
     min_papers: int = 5,
+    research_min: int = 0,
 ) -> List[Tuple[float, CuratedItem, CuratedItemRecord]]:
-    """Select top-N items, ensuring at least min_papers arxiv papers.
+    """Select top-N items, ensuring min_papers arxiv/HF papers.
 
-    If the top-N doesn't include enough arxiv papers, we pull the
-    highest-scoring arxiv papers from ANY position in the scored list
-    and swap them in, pushing out the lowest-scoring non-arxiv items.
+    If research_min > 0, also ensure at least research_min research_paper
+    items with score >= _RESEARCH_FLOOR are in the final set.
     """
-    # Find ALL arxiv items in the full scored list and their best scores.
-    all_arxiv = [(s, c, r) for s, c, r in scored if "arxiv" in r.source_name]
-    all_arxiv.sort(key=lambda x: x[0], reverse=True)
+    # Find all research items in the full scored list.
+    all_research = [(s, c, r) for s, c, r in scored if _is_research(r)]
+    all_research.sort(key=lambda x: x[0], reverse=True)
 
-    # Separate arxiv and non-arxiv in the top-N.
     top = list(scored[:max_items])
-    arxiv_in_top = [(s, c, r) for s, c, r in top if "arxiv" in r.source_name]
+    research_in_top = [(s, c, r) for s, c, r in top if _is_research(r)]
 
-    if len(arxiv_in_top) >= min_papers:
+    effective_min = max(min_papers, research_min)
+    if len(research_in_top) >= effective_min:
         return top
 
-    # Find the best arxiv papers that are NOT in the top (or use all if no more).
-    top_arxiv_ids = {r.raw_item_id for _, _, r in arxiv_in_top}
-    arxiv_not_in_top = [(s, c, r) for s, c, r in all_arxiv if r.raw_item_id not in top_arxiv_ids]
-    arxiv_not_in_top.sort(key=lambda x: x[0], reverse=True)
+    # Find the best research items NOT in the top.
+    top_research_ids = {r.raw_item_id for _, _, r in research_in_top}
+    research_not_in_top = [
+        (s, c, r) for s, c, r in all_research
+        if r.raw_item_id not in top_research_ids
+        and s >= _RESEARCH_FLOOR  # don't backfill below this score
+    ]
+    research_not_in_top.sort(key=lambda x: x[0], reverse=True)
 
-    needed = min_papers - len(arxiv_in_top)
-    to_add = arxiv_not_in_top[:needed]
+    needed = effective_min - len(research_in_top)
+    to_add = research_not_in_top[:needed]
 
-    # Remove lowest-scoring non-arxiv from top to make room.
-    non_arxiv_top = [(s, c, r) for s, c, r in top if "arxiv" not in r.source_name]
-    non_arxiv_top.sort(key=lambda x: x[0])  # ascending — lowest first
-    to_remove = non_arxiv_top[:len(to_add)]
+    # Remove lowest-scoring non-research from top to make room.
+    non_research_top = [(s, c, r) for s, c, r in top if not _is_research(r)]
+    non_research_top.sort(key=lambda x: x[0])  # ascending — lowest first
+    to_remove = non_research_top[:len(to_add)]
 
     remove_ids = {r.raw_item_id for _, _, r in to_remove}
     result = [(s, c, r) for s, c, r in top if r.raw_item_id not in remove_ids]
@@ -445,24 +656,27 @@ def curate_with_llm(
     max_items: int = 20,
     tracer=None,
     budget=None,
+    content_types_cfg: Dict[str, Any] | None = None,
+    score_floor: float = 0.0,
+    research_min: int = 0,
 ) -> Tuple[List[CuratedItem], List[CuratedItemRecord]]:
-    """Curate items using LLM importance scoring + deterministic filtering.
-
-    Flow:
-      1. Deterministic dedup + AI-relevance filter (same as before).
-      2. LLM scores remaining items by news importance (独家性/影响力).
-      3. Combine: LLM_score × 0.6 + deterministic_score × 0.4.
-      4. Apply source diversity penalty to the combined score.
-      5. Sort and take top-N.
-    """
-    weights: Dict[str, float] = {
+    """Curate items using LLM importance scoring + deterministic filtering."""
+    ct_lookup = _build_ct_lookup(source_specs)
+    ct_weights: Dict[str, float] = {}
+    ct_half_lives: Dict[str, float] = {}
+    if content_types_cfg:
+        for ct_key, ct_cfg in content_types_cfg.items():
+            ct_weights[ct_key] = float(ct_cfg.get("source_weight", 0.85))
+            ct_half_lives[ct_key] = float(ct_cfg.get("half_life_h", 48))
+    legacy_weights: Dict[str, float] = {
         s.get("id", ""): float(s.get("weight", 1.0)) for s in source_specs
     }
+
     seen_titles: Dict[str, str] = {}
     seen_urls: set = set()
     now_ts = _time.time()
 
-    # Phase 1: Dedup + AI-relevance filter (deterministic).
+    # Phase 1: Dedup + AI-relevance filter.
     deduped: List[RawItem] = []
     for it in items:
         if not it.title or not it.url:
@@ -486,12 +700,14 @@ def curate_with_llm(
     source_scored_count: Dict[str, int] = Counter()
 
     for it in deduped:
-        w = weights.get(it.source_id, 1.0)
-        r = _recency_score(it.published_at, now_ts)
+        ct = ct_lookup.get(it.source_id, "tech_media")
+        w = ct_weights.get(ct, legacy_weights.get(it.source_id, 1.0))
+        hl = ct_half_lives.get(ct, 48.0)
+        r = _recency_score(it.published_at, now_ts, hl)
         det_score = w * r
 
         key = f"{it.source_id}::{it.url}"
-        llm_s = llm_scores.get(key, 0.5)  # default neutral if LLM didn't score
+        llm_s = llm_scores.get(key, 0.5)
 
         combined = llm_s * 0.65 + det_score * 0.35
 
@@ -506,9 +722,15 @@ def curate_with_llm(
             div_penalty = 0.85
 
         final_score = combined * div_penalty
+
+        # Score floor for fast-news types.
+        if score_floor > 0 and final_score < score_floor:
+            if ct not in ("research_paper", "pricing_page", "financial_report"):
+                continue
+
         source_scored_count[it.source_id] += 1
 
-        reasons = [f"llm={llm_s:.2f}", f"det={det_score:.2f}"]
+        reasons = [f"ct={ct}", f"llm={llm_s:.2f}", f"det={det_score:.2f}"]
         if div_penalty < 1.0:
             reasons.append(f"div={div_penalty:.2f}")
 
@@ -528,5 +750,5 @@ def curate_with_llm(
         scored.append((final_score, curated, record))
 
     scored.sort(key=lambda x: x[0], reverse=True)
-    top = _select_with_paper_quota(scored, max_items, min_papers=_MIN_PAPERS)
+    top = _select_with_paper_quota(scored, max_items, min_papers=_MIN_PAPERS, research_min=research_min)
     return [c for _, c, _ in top], [rec for _, _, rec in top]

@@ -52,7 +52,7 @@ class XCookieAdapter:
         source_id: str,
         username: str,
         account_type: str = "official",
-        max_age_hours: int = 36,
+        max_age_hours: int = 168,
     ) -> None:
         self.source_id = source_id
         self.username = username.lstrip("@")
@@ -127,7 +127,6 @@ def _extract_tweets_from_html(
         r'<time[^>]*datetime="([^"]+)"'
     )
 
-    is_first = True  # first visible tweet is usually pinned
     for m in tweet_pattern.finditer(html):
         text = _strip_html(m.group(1)).strip()
         if not text or text in seen:
@@ -149,10 +148,6 @@ def _extract_tweets_from_html(
             else f"https://x.com/{username}"
         )
 
-        # Check if this tweet is pinned (first tweet + "Pinned" indicator).
-        is_pinned = is_first and "Pinned" in surrounding
-        is_first = False
-
         # Extract real tweet timestamp from <time> element.
         time_match = time_pattern.search(surrounding)
         if time_match:
@@ -161,8 +156,7 @@ def _extract_tweets_from_html(
                     time_match.group(1).replace("Z", "+00:00")
                 )
                 published = ts.isoformat()
-                # Pinned tweets are evergreen — keep them even if old.
-                if not is_pinned and ts < cutoff:
+                if ts < cutoff:
                     continue
             except Exception:
                 published = datetime.now(timezone.utc).isoformat()
