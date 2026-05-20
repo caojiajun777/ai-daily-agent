@@ -440,3 +440,151 @@ def test_all_sources_loadable():
         sid = s.get("id", "")
         if sid:
             assert sid in lookup, f"Source {sid} has no content_type mapping"
+
+
+# ── 8. Source Quality Tiering tests ────────────────────────────────────
+
+
+def test_all_enabled_sources_have_source_tier():
+    """Every enabled source must have source_tier."""
+    import yaml
+    with open("agent/configs/default.yaml", "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+    enabled = [s for s in cfg.get("sources", [])
+               if isinstance(s, dict) and s.get("enabled", True)]
+    missing = [s["id"] for s in enabled if not s.get("source_tier")]
+    assert not missing, f"Sources missing source_tier: {missing}"
+
+
+def test_all_enabled_sources_have_reliability_and_confidence():
+    """Every enabled source must have reliability and default_confidence."""
+    import yaml
+    with open("agent/configs/default.yaml", "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+    enabled = [s for s in cfg.get("sources", [])
+               if isinstance(s, dict) and s.get("enabled", True)]
+    missing_rel = [s["id"] for s in enabled if not s.get("reliability")]
+    missing_conf = [s["id"] for s in enabled if not s.get("default_confidence")]
+    assert not missing_rel, f"Missing reliability: {missing_rel}"
+    assert not missing_conf, f"Missing confidence: {missing_conf}"
+
+
+def test_insider_media_default_confidence_medium():
+    """Insider media sources must not have high confidence."""
+    import yaml
+    with open("agent/configs/default.yaml", "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+    for s in cfg.get("sources", []):
+        if not isinstance(s, dict):
+            continue
+        ct = s.get("content_type", "")
+        if ct == "insider_media":
+            conf = s.get("default_confidence", "")
+            assert conf != "high", (
+                f"{s['id']}: insider_media must not have high confidence, got {conf}"
+            )
+
+
+def test_tier3_not_used_for_major_evidence():
+    """Tier 3 sources should not have high reliability or confidence."""
+    import yaml
+    with open("agent/configs/default.yaml", "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+    for s in cfg.get("sources", []):
+        if not isinstance(s, dict):
+            continue
+        tier = s.get("source_tier", "")
+        if "tier_3" in tier:
+            conf = s.get("default_confidence", "")
+            rel = s.get("reliability", "")
+            assert conf != "high", (
+                f"{s['id']}: tier_3 source must not have high confidence"
+            )
+            assert rel != "high", (
+                f"{s['id']}: tier_3 source must not have high reliability"
+            )
+
+
+def test_cn_aggregator_weights_below_official():
+    """CN aggregators must have lower weight than official sources."""
+    import yaml
+    from agent.agents.curator import _infer_content_type
+    with open("agent/configs/default.yaml", "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+    ct_weights = {}
+    for s in cfg.get("sources", []):
+        if not isinstance(s, dict) or not s.get("enabled", True):
+            continue
+        sid = s.get("id", "")
+        st = s.get("type", "")
+        ct = s.get("content_type", "") or _infer_content_type(sid, st)
+        w = s.get("weight", 1.0)
+        ct_weights.setdefault(ct, []).append(w)
+    cn_avg = sum(ct_weights.get("cn_aggregator", [0])) / max(1, len(ct_weights.get("cn_aggregator", [0])))
+    off_avg = sum(ct_weights.get("official_release", [0])) / max(1, len(ct_weights.get("official_release", [0])))
+    assert cn_avg < off_avg, (
+        f"cn_aggregator avg weight {cn_avg:.2f} should be below official_release {off_avg:.2f}"
+    )
+
+
+def test_founder_signal_weight_below_official_release():
+    """Founder signals should not outweigh official company releases."""
+    import yaml
+    with open("agent/configs/default.yaml", "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+    for s in cfg.get("sources", []):
+        if not isinstance(s, dict):
+            continue
+        ct = s.get("content_type", "")
+        if ct == "founder_signal":
+            w = s.get("weight", 1.0)
+            assert w <= 1.00, (
+                f"{s['id']}: founder_signal weight {w} should be <= 1.00"
+            )
+
+
+def test_official_release_x_accounts_are_tier0():
+    """Official company X accounts should be Tier 0."""
+    import yaml
+    with open("agent/configs/default.yaml", "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+    official_x = [s for s in cfg.get("sources", [])
+                  if isinstance(s, dict) and s.get("enabled", True)
+                  and s.get("content_type") in ("official_release", "china_model_official")
+                  and s.get("type") == "x_cookie"]
+    for s in official_x:
+        tier = s.get("source_tier", "")
+        assert "tier_0" in tier, (
+            f"{s['id']}: official X account must be tier_0, got {tier}"
+        )
+
+
+def test_the_information_classified_as_insider_media():
+    """The Information must be insider_media, not official_release or tech_media."""
+    import yaml
+    with open("agent/configs/default.yaml", "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+    ti = next((s for s in cfg.get("sources", [])
+               if isinstance(s, dict) and s["id"] == "theinformation_ai"), None)
+    assert ti is not None, "theinformation_ai not found in config"
+    ct = ti.get("content_type", "")
+    assert ct == "insider_media", (
+        f"theinformation_ai content_type should be insider_media, got {ct}"
+    )
+    assert ti.get("source_tier") == "tier_1_high_signal"
+
+
+def test_karpathy_handle_checked():
+    """Verify Karpathy X handle is correct (not a placeholder)."""
+    import yaml
+    with open("agent/configs/default.yaml", "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+    karp = next((s for s in cfg.get("sources", [])
+                 if isinstance(s, dict) and s["id"] == "x_karpathy"), None)
+    assert karp is not None, "x_karpathy not found in config"
+    username = karp.get("username", "")
+    # Andrej Karpathy's known handles: @kaboroje is NOT Karpathy
+    assert username != "kaboroje", (
+        f"x_karpathy username is @{username} — @kaboroje is NOT Andrej Karpathy. "
+        f"Karpathy's actual handle is @karpathy"
+    )

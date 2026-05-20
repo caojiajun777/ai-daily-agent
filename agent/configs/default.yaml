@@ -1,32 +1,28 @@
 run:
-  timezone: "Asia/Shanghai"
+  timezone: Asia/Shanghai
   max_items_collect: 200
   max_items_curate: 24
-  language: "zh-CN"
+  language: zh-CN
   enable_vision_enrichment: true
-
 llm:
-  default_provider: "deepseek"
-  default_model: "deepseek-v4-pro"
+  default_provider: deepseek
+  default_model: deepseek-v4-pro
   temperature: 0.3
   max_output_tokens: 8000
   request_timeout_s: 180
   max_retries: 0
   sem_dup_max_tokens: 2048
   repair_max_tokens: 2048
-
 budget:
   max_total_input_tokens: 200000
   max_total_output_tokens: 30000
   max_total_calls: 40
   hard_fail_on_exceed: true
-  # Token Budget Policy: prevent source expansion from exploding LLM tokens
   max_total_context_tokens: 8000
   max_writer_input_tokens: 6000
   max_writer_output_tokens: 3500
   max_daily_llm_calls: 8
   max_daily_estimated_cost_usd: 0.05
-
 token_budget:
   max_raw_items_per_run: 800
   max_candidates_after_filter: 120
@@ -35,34 +31,30 @@ token_budget:
   max_items_per_section: 4
   max_snippet_chars: 500
   budget_overflow_drop_order:
-    - community_signal
-    - market_commentary
-    - vc_signal
-    - cn_aggregator
-    - tech_media
-    - insider_reporter_signal
+  - community_signal
+  - market_commentary
+  - vc_signal
+  - cn_aggregator
+  - tech_media
+  - insider_reporter_signal
   budget_overflow_keep:
-    - official_release
-    - pricing_page
-    - benchmark_tracker
-    - research_paper
-    - china_model_official
-    - china_model_pricing
-
+  - official_release
+  - pricing_page
+  - benchmark_tracker
+  - research_paper
+  - china_model_official
+  - china_model_pricing
 context:
   max_messages_keep: 20
   per_message_max_chars: 6000
-
 eval:
   min_unique_titles_ratio: 0.8
   min_section_count: 6
   forbid_phrases:
-    - "作为AI"
-    - "I cannot"
-    - "Lorem ipsum"
-
+  - 作为AI
+  - I cannot
+  - Lorem ipsum
 content_types:
-  # ── Official sources ──
   official_release:
     source_weight: 1.35
     half_life_h: 48
@@ -72,60 +64,54 @@ content_types:
   pricing_page:
     source_weight: 1.35
     half_life_h: 168
-  # ── Research ──
   research_paper:
     source_weight: 1.05
     half_life_h: 120
   github_release:
     source_weight: 0.95
     half_life_h: 72
-  # ── China model vendors ──
   china_model_official:
     source_weight: 1.25
     half_life_h: 48
   china_model_docs:
-    source_weight: 1.30
+    source_weight: 1.3
     half_life_h: 168
   china_model_pricing:
     source_weight: 1.35
     half_life_h: 168
   china_product_changelog:
-    source_weight: 1.00
+    source_weight: 1.0
     half_life_h: 72
   china_ecosystem_signal:
-    source_weight: 0.80
+    source_weight: 0.8
     half_life_h: 48
-  # ── Benchmark & Product ──
   benchmark_tracker:
-    source_weight: 1.20
+    source_weight: 1.2
     half_life_h: 72
   product_changelog:
-    source_weight: 1.00
+    source_weight: 1.0
     half_life_h: 72
-  # ── Infra & Finance ──
   infra_signal:
-    source_weight: 1.10
+    source_weight: 1.1
     half_life_h: 120
   financial_report:
-    source_weight: 1.30
+    source_weight: 1.3
     half_life_h: 120
-  # ── People signals ──
   founder_signal:
-    source_weight: 1.00
+    source_weight: 1.0
     half_life_h: 36
   researcher_signal:
     source_weight: 0.95
     half_life_h: 72
   expert_signal:
-    source_weight: 0.90
+    source_weight: 0.9
     half_life_h: 72
   expert_newsletter:
-    source_weight: 0.90
+    source_weight: 0.9
     half_life_h: 96
   builder_signal:
-    source_weight: 0.90
+    source_weight: 0.9
     half_life_h: 72
-  # ── Insider & VC ──
   insider_media:
     source_weight: 1.05
     half_life_h: 72
@@ -133,13 +119,11 @@ content_types:
     source_weight: 0.95
     half_life_h: 36
   vc_signal:
-    source_weight: 0.80
+    source_weight: 0.8
     half_life_h: 36
-  # ── Safety ──
   safety_eval:
-    source_weight: 1.00
+    source_weight: 1.0
     half_life_h: 120
-  # ── Media & Community ──
   tech_media:
     source_weight: 0.85
     half_life_h: 36
@@ -152,768 +136,1118 @@ content_types:
   market_commentary:
     source_weight: 0.65
     half_life_h: 24
-
 curation:
-  mode: "research_editor"   # rules_only | research_editor | legacy_llm_scoring
+  mode: research_editor
   candidate_top_k: 40
   final_min_items: 16
   final_max_items: 22
   history_window_days: 7
   fallback_to_rules: true
   legacy_llm_scoring_enabled: false
-  enable_evidence_fetch: false   # off by default — adds ~20s per run
+  enable_evidence_fetch: false
   evidence_fetch_timeout_sec: 8
   llm_rerank_timeout_sec: 60
-  score_floor: 0.10
-
+  score_floor: 0.1
 section_quotas:
   research_frontier:
     min: 2
     max: 4
-
 publish:
-  # Publish gate: a draft must clear ALL of these before an issue is created.
   minimum_items: 3
   max_eval_issues: 0
   require_critic_pass: true
-  # Duplicate protection: when querying recent issues we look at this many.
   recent_issues_to_check: 30
-  # Title prefix; final title is "<prefix><date>" e.g. "AI 早报 2026-05-09".
-  title_prefix: "AI 日报 "
-  # Labels applied to the created issue. Can be overridden by env
-  # PUBLISH_ISSUE_LABELS (comma-separated).
+  title_prefix: 'AI 日报 '
   default_labels:
-    - "agent-generated"
-  # Email subscribers (comma-separated in env EMAIL_SUBSCRIBERS overrides this).
+  - agent-generated
   subscribers:
-    - "905562805@qq.com"
-    - "1780609071@qq.com"
-
+  - 905562805@qq.com
+  - 1780609071@qq.com
 sources:
-  # ═══════════════════════════════════════════════════════════════
-  # X / Twitter — AI 行业一手消息的最快来源
-  # 需要环境变量 X_BEARER_TOKEN（X API v2 Basic, ~$100/mo）
-  # 无 TOKEN 时自动跳过，不影响其他源。
-  # ═══════════════════════════════════════════════════════════════
-
-  # --- 国际官方 ---
-  - id: "x_openai"
-    type: "x_cookie"
-    username: "OpenAI"
-    account_type: "official"
-    weight: 1.3
-    max_items: 8
-
-  - id: "x_anthropic"
-    type: "x_cookie"
-    username: "AnthropicAI"
-    account_type: "official"
-    weight: 1.2
-    max_items: 8
-
-  - id: "x_googledeepmind"
-    type: "x_cookie"
-    username: "GoogleDeepMind"
-    account_type: "official"
-    weight: 1.2
-    max_items: 8
-
-  - id: "x_metaai"
-    type: "x_cookie"
-    username: "AIatMeta"
-    account_type: "official"
-    weight: 1.1
-    max_items: 6
-
-  - id: "x_mistralai"
-    type: "x_cookie"
-    username: "MistralAI"
-    account_type: "official"
-    weight: 1.1
-    max_items: 6
-
-  - id: "x_stabilityai"
-    type: "x_cookie"
-    username: "StabilityAI"
-    account_type: "official"
-    weight: 0.9
-    max_items: 5
-
-  # --- 国内官方 ---
-  - id: "x_deepseek"
-    type: "x_cookie"
-    username: "deepseek_ai"
-    account_type: "official"
-    weight: 1.4
-    max_items: 8
-
-  - id: "x_baidu"
-    type: "x_cookie"
-    username: "Baidu_Inc"
-    account_type: "official"
-    weight: 1.1
-    max_items: 6
-
-  - id: "x_alicloud"
-    type: "x_cookie"
-    username: "alibaba_cloud"
-    account_type: "official"
-    weight: 1.1
-    max_items: 6
-
-  - id: "x_qwen"
-    type: "x_cookie"
-    username: "Alibaba_Qwen"
-    account_type: "official"
-    weight: 1.2
-    max_items: 6
-
-  - id: "x_zhipu"
-    type: "x_cookie"
-    username: "ChatGLM"
-    account_type: "official"
-    weight: 1.1
-    max_items: 6
-
-  - id: "x_stepfun"
-    type: "x_cookie"
-    username: "StepFun_ai"
-    account_type: "official"
-    weight: 1.0
-    max_items: 5
-
-  - id: "x_tencent_hunyuan"
-    type: "x_cookie"
-    username: "TencentHunyuan"
-    account_type: "official"
-    weight: 1.0
-    max_items: 5
-
-  - id: "x_siliconflow"
-    type: "x_cookie"
-    username: "SiliconFlowAI"
-    account_type: "official"
-    weight: 0.9
-    max_items: 5
-
-  - id: "x_01ai"
-    type: "x_cookie"
-    username: "01AI_Yi"
-    account_type: "official"
-    weight: 1.0
-    max_items: 5
-
-  - id: "x_moonshot"
-    type: "x_cookie"
-    username: "moonshot_ai"
-    account_type: "official"
-    weight: 1.0
-    max_items: 5
-
-  - id: "x_minimax"
-    type: "x_cookie"
-    username: "MiniMax_AI"
-    account_type: "official"
-    weight: 0.9
-    max_items: 5
-
-  - id: "x_kuaishou_kling"
-    type: "x_cookie"
-    username: "Kling_AI"
-    account_type: "official"
-    weight: 0.9
-    max_items: 5
-
-  # --- 硅谷领军人物 ---
-  # 大厂核心人物：一手产品/研究动态往往先在个人号上出现
-  - id: "x_sama"
-    type: "x_cookie"
-    username: "sama"
-    account_type: "official"
-    weight: 1.4
-    max_items: 5
-
-  - id: "x_gdb"
-    type: "x_cookie"
-    username: "gdb"
-    account_type: "official"
-    weight: 1.3
-    max_items: 5
-
-  - id: "x_ilyasut"
-    type: "x_cookie"
-    username: "ilyasut"
-    account_type: "kol"
-    weight: 1.2
-    max_items: 5
-
-  - id: "x_clem"
-    type: "x_cookie"
-    username: "clem"
-    account_type: "official"
-    weight: 1.1
-    max_items: 5
-
-  # --- 顶级研究者 / KOL ---
-  - id: "x_karpathy"
-    type: "x_cookie"
-    username: "kaboroje"
-    account_type: "kol"
-    weight: 1.3
-    max_items: 5
-
-  - id: "x_ylecun"
-    type: "x_cookie"
-    username: "ylecun"
-    account_type: "kol"
-    weight: 1.2
-    max_items: 5
-
-  - id: "x_jimfan"
-    type: "x_cookie"
-    username: "jimfan"
-    account_type: "kol"
-    weight: 1.1
-    max_items: 5
-
-  - id: "x_AndrewYNg"
-    type: "x_cookie"
-    username: "AndrewYNg"
-    account_type: "kol"
-    weight: 1.0
-    max_items: 5
-
-  - id: "x_fchollet"
-    type: "x_cookie"
-    username: "fchollet"
-    account_type: "kol"
-    weight: 1.1
-    max_items: 5
-
-  # --- 一手爆料 / 论文速递 ---
-  # AK 是 X 上最高产的 AI 论文分享者，新 paper 几乎都在这里首发
-  - id: "x_akhaliq"
-    type: "x_cookie"
-    username: "_akhaliq"
-    account_type: "kol"
-    weight: 1.1
-    max_items: 5
-
-  # Simon Willison：AI 工具链与开发者生态的深度观察
-  - id: "x_simonw"
-    type: "x_cookie"
-    username: "simonw"
-    account_type: "kol"
-    weight: 1.0
-    max_items: 5
-
-  # George Hotz (tinygrad)：开源 AI 硬件 + 另类技术路线
-  - id: "x_tinygrad"
-    type: "x_cookie"
-    username: "__tinygrad__"
-    account_type: "kol"
-    weight: 0.9
-    max_items: 5
-
-  # --- 中文 KOL ---
-  - id: "x_dotey"
-    type: "x_cookie"
-    username: "dotey"
-    account_type: "kol"
-    weight: 1.0
-    max_items: 5
-
-  - id: "x_ayi"
-    type: "x_cookie"
-    username: "AYi_AInotes"
-    account_type: "kol"
-    weight: 1.0
-    max_items: 5
-
-  - id: "x_yi_ding"
-    type: "x_cookie"
-    username: "YiChuaCai"
-    account_type: "kol"
-    weight: 0.9
-    max_items: 5
-
-  # ═══════════════════════════════════════════════════════════════
-  # RSS — 大厂官方博客
-  # ═══════════════════════════════════════════════════════════════
-  - id: "openai_news"
-    type: "rss"
-    url: "https://openai.com/news/rss.xml"
-    weight: 1.4
-    max_items: 12
-
-  # Anthropic has no public RSS feed. Coverage via:
-  #   @AnthropicAI on X, TechCrunch AI, The Verge AI, arXiv papers.
-  # anthropic_news REMOVED (RSS URL returned 404)
-
-  - id: "google_deepmind_blog"
-    type: "rss"
-    url: "https://deepmind.google/blog/rss.xml"
-    weight: 1.1
-    max_items: 8
-
-  - id: "google_ai_blog"
-    type: "rss"
-    url: "https://blog.google/technology/ai/rss/"
-    weight: 1.0
-    max_items: 8
-
-  - id: "meta_ai_blog"
-    type: "rss"
-    url: "https://ai.meta.com/blog/rss/"
-    weight: 1.0
-    max_items: 6
-
-  - id: "microsoft_ai_blog"
-    type: "rss"
-    url: "https://blogs.microsoft.com/ai/feed/"
-    weight: 1.0
-    max_items: 6
-
-  # ═══════════════════════════════════════════════════════════════
-  # ═══════════════════════════════════════════════════════════════
-  # arXiv — top AI venue papers only (NeurIPS/ICML/ICLR/CVPR/ACL etc.)
-  # ═══════════════════════════════════════════════════════════════
-  - id: "arxiv_top_venue"
-    type: "arxiv"
-    categories: "cs.AI+OR+cs.CL+OR+cs.LG+OR+cs.CV+OR+cs.MA+OR+stat.ML"
-    max_age_days: 3
-    top_venue_only: false
-    weight: 0.85
-    max_items: 100
-
-  # ═══════════════════════════════════════════════════════════════
-  # HuggingFace Daily Papers — community-curated top ML papers
-  # ═══════════════════════════════════════════════════════════════
-  - id: "hf_daily_papers"
-    type: "rss"
-    url: "https://huggingface.co/papers/feed.xml"
-    weight: 0.9
-    max_items: 15
-
-  # RSS — 研究与模型平台
-  # ═══════════════════════════════════════════════════════════════
-  - id: "huggingface_blog"
-    type: "rss"
-    url: "https://huggingface.co/blog/feed.xml"
-    weight: 1.1
-    max_items: 10
-
-  - id: "paperswithcode_blog"
-    type: "rss"
-    url: "https://paperswithcode.com/blog/feed"
-    weight: 0.9
-    max_items: 6
-
-  # ═══════════════════════════════════════════════════════════════
-  # RSS — 国际科技媒体
-  # ═══════════════════════════════════════════════════════════════
-  - id: "mit_tech_review_ai"
-    type: "rss"
-    url: "https://www.technologyreview.com/feed/"
-    weight: 0.9
-    max_items: 6
-
-  - id: "venturebeat_ai"
-    type: "rss"
-    url: "https://venturebeat.com/category/ai/feed/"
-    weight: 0.9
-    max_items: 6
-
-  - id: "ars_technica_ai"
-    type: "rss"
-    url: "https://feeds.arstechnica.com/arstechnica/technology-lab"
-    weight: 0.8
-    max_items: 6
-
-  - id: "wired_ai"
-    type: "rss"
-    url: "https://www.wired.com/feed/tag/ai/latest/rss"
-    weight: 0.8
-    max_items: 5
-
-  # ═══════════════════════════════════════════════════════════════
-  # RSS — 硅谷资本与行业叙事
-  # ═══════════════════════════════════════════════════════════════
-  - id: "techcrunch_ai"
-    type: "rss"
-    url: "https://techcrunch.com/category/artificial-intelligence/feed/"
-    weight: 0.95
-    max_items: 8
-
-  - id: "the_verge_ai"
-    type: "rss"
-    url: "https://www.theverge.com/ai-artificial-intelligence/rss/index.xml"
-    weight: 0.9
-    max_items: 8
-
-  - id: "theinformation_ai"
-    type: "rss"
-    url: "https://www.theinformation.com/feed?tag=artificial-intelligence"
-    weight: 0.85
-    max_items: 6
-
-  # ═══════════════════════════════════════════════════════════════
-  # ═══════════════════════════════════════════════════════════════
-  # AI HOT Daily — curated Chinese AI news with source attribution
-  # ═══════════════════════════════════════════════════════════════
-  - id: "aihot_daily"
-    type: "aihot"
-    url: "https://aihot.virxact.com/daily"
-    weight: 0.85
-    max_items: 15
-
-  # RSS — 中文科技资讯
-  # weights intentionally lower: these cover broad tech, not pure AI.
-  # The curator's AI-relevance filter + diversity penalty prevents
-  # non-AI items and single-source dominance.
-  # ═══════════════════════════════════════════════════════════════
-  - id: "ithome"
-    type: "rss"
-    url: "https://www.ithome.com/rss/"
-    weight: 0.6
-    max_items: 8
-
-  - id: "jiqizhixin"
-    type: "rss"
-    url: "https://www.jiqizhixin.com/rss"
-    weight: 0.9
-    max_items: 8
-
-  - id: "qbitai"
-    type: "rss"
-    url: "https://www.qbitai.com/feed"
-    weight: 0.8
-    max_items: 6
-
-  # 36kr RSS 格式不稳定，Writer 容易幻觉 URL — 暂时低权重观察
-  - id: "36kr_ai"
-    type: "rss"
-    url: "https://36kr.com/feed?cid=330"
-    weight: 0.4
-    max_items: 3
-
-  # ═══════════════════════════════════════════════════════════════
-  # RSS — 简报与社区
-  # ═══════════════════════════════════════════════════════════════
-  - id: "the_batch"
-    type: "rss"
-    url: "https://www.deeplearning.ai/the-batch/feed/"
-    weight: 1.0
-    max_items: 6
-
-  - id: "import_ai"
-    type: "rss"
-    url: "https://jack-clark.net/feed/"
-    weight: 0.9
-    max_items: 5
-
-  # ═══════════════════════════════════════════════════════════════
-  # v3: China Model Vendor Sources — official, docs, pricing, repos
-  # ═══════════════════════════════════════════════════════════════
-
-  # --- DeepSeek / 深度求索 ---
-  - id: "deepseek_pricing"
-    type: "rss"
-    enabled: false
-    url: "https://api-docs.deepseek.com/news"
-    content_type: "china_model_pricing"
-    weight: 1.35
-    half_life_h: 168
-    max_items: 3
-    notes: "stub: needs http_snapshot adapter for pricing page"
-
-  - id: "deepseek_github_releases"
-    type: "rss"
-    enabled: false
-    url: "https://github.com/deepseek-ai/DeepSeek-V3/releases.atom"
-    content_type: "github_release"
-    weight: 1.05
-    half_life_h: 72
-    max_items: 5
-
-  # --- Alibaba Qwen / 通义千问 ---
-  - id: "qwen_github_releases"
-    type: "rss"
-    enabled: false
-    url: "https://github.com/QwenLM/Qwen3/releases.atom"
-    content_type: "github_release"
-    weight: 1.05
-    half_life_h: 72
-    max_items: 5
-
-  - id: "qwen_modelscope"
-    type: "rss"
-    enabled: false
-    url: "https://modelscope.cn/models/Qwen/rss"
-    content_type: "china_ecosystem_signal"
-    weight: 0.80
-    half_life_h: 48
-    max_items: 5
-
-  # --- ByteDance Doubao / 火山方舟 ---
-  - id: "volcengine_ark_docs"
-    type: "rss"
-    enabled: false
-    content_type: "china_model_docs"
-    weight: 1.30
-    half_life_h: 168
-    max_items: 3
-    notes: "stub: needs http_snapshot for ark docs changelog"
-
-  # --- Moonshot / Kimi / 月之暗面 ---
-  - id: "moonshot_api_docs"
-    type: "rss"
-    enabled: false
-    content_type: "china_model_docs"
-    weight: 1.30
-    half_life_h: 168
-    max_items: 3
-
-  # --- Zhipu / 智谱 ---
-  - id: "bigmodel_docs"
-    type: "rss"
-    enabled: false
-    content_type: "china_model_docs"
-    weight: 1.30
-    half_life_h: 168
-    max_items: 3
-
-  # --- Baidu ERNIE / 千帆 ---
-  - id: "baidu_qianfan_docs"
-    type: "rss"
-    enabled: false
-    content_type: "china_model_docs"
-    weight: 1.30
-    half_life_h: 168
-    max_items: 3
-
-  # --- Tencent Hunyuan ---
-  - id: "tencent_hunyuan_docs"
-    type: "rss"
-    enabled: false
-    content_type: "china_model_docs"
-    weight: 1.30
-    half_life_h: 168
-    max_items: 3
-
-  # --- 01.AI / Yi ---
-  - id: "zeroone_api_docs"
-    type: "rss"
-    enabled: false
-    content_type: "china_model_docs"
-    weight: 1.30
-    half_life_h: 168
-    max_items: 3
-
-  # --- Baichuan ---
-  - id: "baichuan_api_docs"
-    type: "rss"
-    enabled: false
-    content_type: "china_model_docs"
-    weight: 1.30
-    half_life_h: 168
-    max_items: 3
-
-  # --- SiliconFlow / 硅基流动 ---
-  - id: "siliconflow_docs"
-    type: "rss"
-    enabled: false
-    content_type: "china_ecosystem_signal"
-    weight: 0.80
-    half_life_h: 48
-    max_items: 3
-
-  # --- ModelScope ---
-  - id: "modelscope_trending"
-    type: "rss"
-    enabled: false
-    content_type: "china_ecosystem_signal"
-    weight: 0.80
-    half_life_h: 48
-    max_items: 5
-    notes: "stub: needs custom scraper for modelscope trending"
-
-  # ═══════════════════════════════════════════════════════════════
-  # v3: International Benchmark, Pricing, Infra Sources
-  # ═══════════════════════════════════════════════════════════════
-
-  - id: "artificial_analysis"
-    type: "rss"
-    enabled: false
-    content_type: "benchmark_tracker"
-    weight: 1.20
-    half_life_h: 72
-    max_items: 3
-    notes: "stub: needs http_snapshot for model performance/price leaderboard"
-
-  - id: "lmarena_leaderboard"
-    type: "rss"
-    enabled: false
-    content_type: "benchmark_tracker"
-    weight: 1.20
-    half_life_h: 72
-    max_items: 3
-    notes: "stub: LMSYS Chatbot Arena"
-
-  - id: "livebench"
-    type: "rss"
-    enabled: false
-    content_type: "benchmark_tracker"
-    weight: 1.20
-    half_life_h: 72
-    max_items: 3
-    notes: "stub: livebench.ai"
-
-  - id: "openrouter_models_pricing"
-    type: "rss"
-    enabled: false
-    content_type: "pricing_page"
-    weight: 1.20
-    half_life_h: 168
-    max_items: 3
-    notes: "stub: openrouter.ai/models — aggregate pricing API"
-
-  - id: "nvidia_technical_blog"
-    type: "rss"
-    url: "https://developer.nvidia.com/blog/feed/"
-    content_type: "infra_signal"
-    weight: 1.10
-    half_life_h: 120
-    max_items: 5
-
-  - id: "vllm_releases"
-    type: "rss"
-    enabled: false
-    url: "https://github.com/vllm-project/vllm/releases.atom"
-    content_type: "infra_signal"
-    weight: 0.90
-    half_life_h: 72
-    max_items: 3
-
-  - id: "ollama_releases"
-    type: "rss"
-    enabled: false
-    url: "https://github.com/ollama/ollama/releases.atom"
-    content_type: "infra_signal"
-    weight: 0.80
-    half_life_h: 72
-    max_items: 3
-
-  # ═══════════════════════════════════════════════════════════════
-  # v3: Silicon Valley Insider, VC, Builder Signal Sources
-  # ═══════════════════════════════════════════════════════════════
-
-  # Insider media (enabled=false until adapter verified)
-  - id: "the_information_ai"
-    type: "rss"
-    enabled: false
-    url: "https://www.theinformation.com/feed"
-    content_type: "insider_media"
-    weight: 1.05
-    half_life_h: 72
-    max_items: 5
-    notes: "paywalled; use snippet_only parser"
-
-  - id: "bloomberg_ai"
-    type: "rss"
-    enabled: false
-    url: "https://feeds.bloomberg.com/technology/ai.xml"
-    content_type: "insider_media"
-    weight: 1.05
-    half_life_h: 72
-    max_items: 5
-
-  - id: "axios_ai"
-    type: "rss"
-    enabled: false
-    url: "https://www.axios.com/feeds/ai-future.xml"
-    content_type: "insider_media"
-    weight: 1.00
-    half_life_h: 72
-    max_items: 5
-
-  # VC signal (X accounts, enabled=false until handle verified)
-  - id: "vc_a16z_ai"
-    type: "x_cookie"
-    enabled: false
-    username: "a16z"
-    account_type: "vc"
-    content_type: "vc_signal"
-    weight: 0.80
-    half_life_h: 36
-    max_items: 3
-    notes: "do not treat as investment advice"
-
-  - id: "vc_sequoia_ai"
-    type: "x_cookie"
-    enabled: false
-    username: "sequoia"
-    account_type: "vc"
-    content_type: "vc_signal"
-    weight: 0.80
-    half_life_h: 36
-    max_items: 3
-
-  # Builder signal (X accounts)
-  - id: "builder_swyx"
-    type: "x_cookie"
-    enabled: false
-    username: "swyx"
-    account_type: "kol"
-    content_type: "builder_signal"
-    weight: 0.90
-    half_life_h: 72
-    max_items: 3
-
-  - id: "builder_lilian_weng"
-    type: "x_cookie"
-    enabled: false
-    username: "lilianweng"
-    account_type: "kol"
-    content_type: "builder_signal"
-    weight: 0.90
-    half_life_h: 72
-    max_items: 3
-
-  # Expert newsletters
-  - id: "latent_space"
-    type: "rss"
-    enabled: false
-    url: "https://www.latent.space/feed"
-    content_type: "expert_newsletter"
-    weight: 0.90
-    half_life_h: 96
-    max_items: 5
-
-  - id: "interconnects"
-    type: "rss"
-    enabled: false
-    url: "https://www.interconnects.ai/feed"
-    content_type: "expert_newsletter"
-    weight: 0.90
-    half_life_h: 96
-    max_items: 5
-
-  # Product changelogs
-  - id: "cursor_changelog"
-    type: "rss"
-    enabled: false
-    url: "https://cursor.com/changelog/rss"
-    content_type: "product_changelog"
-    weight: 1.00
-    half_life_h: 72
-    max_items: 3
-
-  - id: "github_copilot_changelog"
-    type: "rss"
-    enabled: false
-    url: "https://github.blog/changelog/label/copilot/feed/"
-    content_type: "product_changelog"
-    weight: 1.00
-    half_life_h: 72
-    max_items: 3
+- id: x_openai
+  type: x_cookie
+  username: OpenAI
+  account_type: official
+  weight: 1.3
+  max_items: 8
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: x_anthropic
+  type: x_cookie
+  username: AnthropicAI
+  account_type: official
+  weight: 1.2
+  max_items: 8
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: x_googledeepmind
+  type: x_cookie
+  username: GoogleDeepMind
+  account_type: official
+  weight: 1.2
+  max_items: 8
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: x_metaai
+  type: x_cookie
+  username: AIatMeta
+  account_type: official
+  weight: 1.1
+  max_items: 6
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: x_mistralai
+  type: x_cookie
+  username: MistralAI
+  account_type: official
+  weight: 1.1
+  max_items: 6
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: x_stabilityai
+  type: x_cookie
+  username: StabilityAI
+  account_type: official
+  weight: 0.9
+  max_items: 5
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: x_deepseek
+  type: x_cookie
+  username: deepseek_ai
+  account_type: official
+  weight: 1.4
+  max_items: 8
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: x_baidu
+  type: x_cookie
+  username: Baidu_Inc
+  account_type: official
+  weight: 1.1
+  max_items: 6
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: x_alicloud
+  type: x_cookie
+  username: alibaba_cloud
+  account_type: official
+  weight: 1.1
+  max_items: 6
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: x_qwen
+  type: x_cookie
+  username: Alibaba_Qwen
+  account_type: official
+  weight: 1.2
+  max_items: 6
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: x_zhipu
+  type: x_cookie
+  username: ChatGLM
+  account_type: official
+  weight: 1.1
+  max_items: 6
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: x_stepfun
+  type: x_cookie
+  username: StepFun_ai
+  account_type: official
+  weight: 1.0
+  max_items: 5
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: x_tencent_hunyuan
+  type: x_cookie
+  username: TencentHunyuan
+  account_type: official
+  weight: 1.0
+  max_items: 5
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: x_siliconflow
+  type: x_cookie
+  username: SiliconFlowAI
+  account_type: official
+  weight: 0.9
+  max_items: 5
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: low
+  evidence_type: community_signal
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: developer,researcher
+- id: x_01ai
+  type: x_cookie
+  username: 01AI_Yi
+  account_type: official
+  weight: 1.0
+  max_items: 5
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: x_moonshot
+  type: x_cookie
+  username: moonshot_ai
+  account_type: official
+  weight: 1.0
+  max_items: 5
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: x_minimax
+  type: x_cookie
+  username: MiniMax_AI
+  account_type: official
+  weight: 0.9
+  max_items: 5
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: x_kuaishou_kling
+  type: x_cookie
+  username: Kling_AI
+  account_type: official
+  weight: 0.9
+  max_items: 5
+  source_tier: tier_1_high_signal
+  reliability: high
+  default_confidence: medium
+  evidence_type: product_changelog
+  section_hint: Product & Workflow Impact
+  audience_hint: developer,product
+- id: x_sama
+  type: x_cookie
+  username: sama
+  account_type: official
+  weight: 1.0
+  max_items: 5
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: founder_signal
+  section_hint: Industry Strategy & Company Moves
+  audience_hint: founder,investor
+- id: x_gdb
+  type: x_cookie
+  username: gdb
+  account_type: official
+  weight: 0.95
+  max_items: 5
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: founder_signal
+  section_hint: Industry Strategy & Company Moves
+  audience_hint: founder,investor
+- id: x_ilyasut
+  type: x_cookie
+  username: ilyasut
+  account_type: kol
+  weight: 0.95
+  max_items: 5
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: researcher_signal
+  section_hint: Research Frontier
+  audience_hint: researcher
+- id: x_clem
+  type: x_cookie
+  username: clem
+  account_type: official
+  weight: 0.95
+  max_items: 5
+  content_type: founder_signal
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: founder_signal
+  section_hint: Industry Strategy & Company Moves
+  audience_hint: founder,investor
+- id: x_karpathy
+  type: x_cookie
+  username: karpathy
+  account_type: kol
+  weight: 0.95
+  max_items: 5
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: researcher_signal
+  section_hint: Research Frontier
+  audience_hint: researcher
+  notes: Andrej Karpathy — corrected from @kaboroje (wrong handle)
+- id: x_ylecun
+  type: x_cookie
+  username: ylecun
+  account_type: kol
+  weight: 0.9
+  max_items: 5
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: researcher_signal
+  section_hint: Research Frontier
+  audience_hint: researcher
+- id: x_jimfan
+  type: x_cookie
+  username: jimfan
+  account_type: kol
+  weight: 0.9
+  max_items: 5
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: researcher_signal
+  section_hint: Research Frontier
+  audience_hint: researcher
+- id: x_AndrewYNg
+  type: x_cookie
+  username: AndrewYNg
+  account_type: kol
+  weight: 0.85
+  max_items: 5
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: expert_signal
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: researcher,developer
+- id: x_fchollet
+  type: x_cookie
+  username: fchollet
+  account_type: kol
+  weight: 0.9
+  max_items: 5
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: researcher_signal
+  section_hint: Research Frontier
+  audience_hint: researcher
+- id: x_akhaliq
+  type: x_cookie
+  username: _akhaliq
+  account_type: kol
+  weight: 0.9
+  max_items: 5
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: expert_signal
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: researcher,developer
+- id: x_simonw
+  type: x_cookie
+  username: simonw
+  account_type: kol
+  weight: 0.85
+  max_items: 5
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: builder_signal
+  section_hint: Product & Workflow Impact
+  audience_hint: developer
+- id: x_tinygrad
+  type: x_cookie
+  username: __tinygrad__
+  account_type: kol
+  weight: 0.8
+  max_items: 5
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: builder_signal
+  section_hint: Product & Workflow Impact
+  audience_hint: developer
+- id: x_dotey
+  type: x_cookie
+  username: dotey
+  account_type: kol
+  weight: 0.7
+  max_items: 5
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: low
+  evidence_type: community_signal
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: developer,researcher
+- id: x_ayi
+  type: x_cookie
+  username: AYi_AInotes
+  account_type: kol
+  weight: 0.7
+  max_items: 5
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: low
+  evidence_type: community_signal
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: developer,researcher
+- id: x_yi_ding
+  type: x_cookie
+  username: YiChuaCai
+  account_type: kol
+  weight: 0.65
+  max_items: 5
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: low
+  evidence_type: community_signal
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: developer,researcher
+- id: openai_news
+  type: rss
+  url: https://openai.com/news/rss.xml
+  weight: 1.4
+  max_items: 12
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: google_deepmind_blog
+  type: rss
+  url: https://deepmind.google/blog/rss.xml
+  weight: 1.1
+  max_items: 8
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: google_ai_blog
+  type: rss
+  url: https://blog.google/technology/ai/rss/
+  weight: 1.0
+  max_items: 8
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: meta_ai_blog
+  type: rss
+  url: https://ai.meta.com/blog/rss/
+  weight: 1.0
+  max_items: 6
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: microsoft_ai_blog
+  type: rss
+  url: https://blogs.microsoft.com/ai/feed/
+  weight: 1.0
+  max_items: 6
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: arxiv_top_venue
+  type: arxiv
+  categories: cs.AI+OR+cs.CL+OR+cs.LG+OR+cs.CV+OR+cs.MA+OR+stat.ML
+  max_age_days: 3
+  top_venue_only: false
+  weight: 1.05
+  max_items: 100
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: medium
+  evidence_type: paper
+  section_hint: Research Frontier
+  audience_hint: researcher,developer
+- id: hf_daily_papers
+  type: rss
+  url: https://huggingface.co/papers/feed.xml
+  weight: 1.0
+  max_items: 15
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: medium
+  evidence_type: paper
+  section_hint: Research Frontier
+  audience_hint: researcher,developer
+- id: huggingface_blog
+  type: rss
+  url: https://huggingface.co/blog/feed.xml
+  weight: 1.1
+  max_items: 10
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+- id: paperswithcode_blog
+  type: rss
+  url: https://paperswithcode.com/blog/feed
+  weight: 0.9
+  max_items: 6
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: medium
+  evidence_type: paper
+  section_hint: Research Frontier
+  audience_hint: researcher,developer
+- id: mit_tech_review_ai
+  type: rss
+  url: https://www.technologyreview.com/feed/
+  weight: 0.9
+  max_items: 6
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: media_report
+  section_hint: Industry Strategy & Company Moves
+  audience_hint: all
+- id: venturebeat_ai
+  type: rss
+  url: https://venturebeat.com/category/ai/feed/
+  weight: 0.9
+  max_items: 6
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: media_report
+  section_hint: Industry Strategy & Company Moves
+  audience_hint: all
+- id: ars_technica_ai
+  type: rss
+  url: https://feeds.arstechnica.com/arstechnica/technology-lab
+  weight: 0.8
+  max_items: 6
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: media_report
+  section_hint: Industry Strategy & Company Moves
+  audience_hint: all
+- id: wired_ai
+  type: rss
+  url: https://www.wired.com/feed/tag/ai/latest/rss
+  weight: 0.8
+  max_items: 5
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: media_report
+  section_hint: Industry Strategy & Company Moves
+  audience_hint: all
+- id: techcrunch_ai
+  type: rss
+  url: https://techcrunch.com/category/artificial-intelligence/feed/
+  weight: 0.95
+  max_items: 8
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: media_report
+  section_hint: Industry Strategy & Company Moves
+  audience_hint: all
+- id: the_verge_ai
+  type: rss
+  url: https://www.theverge.com/ai-artificial-intelligence/rss/index.xml
+  weight: 0.9
+  max_items: 8
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: media_report
+  section_hint: Industry Strategy & Company Moves
+  audience_hint: all
+- id: theinformation_ai
+  type: rss
+  url: https://www.theinformation.com/feed?tag=artificial-intelligence
+  weight: 0.85
+  max_items: 6
+  content_type: insider_media
+  source_tier: tier_1_high_signal
+  reliability: high
+  default_confidence: medium
+  evidence_type: insider_report
+  section_hint: Industry Strategy & Company Moves
+  audience_hint: founder,investor,market_watcher
+- id: aihot_daily
+  type: aihot
+  url: https://aihot.virxact.com/daily
+  weight: 0.7
+  max_items: 15
+  source_tier: tier_3_pulse_noise
+  reliability: medium
+  default_confidence: low
+  evidence_type: media_aggregator
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: all
+- id: ithome
+  type: rss
+  url: https://www.ithome.com/rss/
+  weight: 0.5
+  max_items: 8
+  source_tier: tier_3_pulse_noise
+  reliability: medium
+  default_confidence: low
+  evidence_type: media_aggregator
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: all
+- id: jiqizhixin
+  type: rss
+  url: https://www.jiqizhixin.com/rss
+  weight: 0.75
+  max_items: 8
+  source_tier: tier_3_pulse_noise
+  reliability: medium
+  default_confidence: low
+  evidence_type: media_aggregator
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: all
+- id: qbitai
+  type: rss
+  url: https://www.qbitai.com/feed
+  weight: 0.7
+  max_items: 6
+  source_tier: tier_3_pulse_noise
+  reliability: medium
+  default_confidence: low
+  evidence_type: media_aggregator
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: all
+- id: 36kr_ai
+  type: rss
+  url: https://36kr.com/feed?cid=330
+  weight: 0.4
+  max_items: 3
+  source_tier: tier_3_pulse_noise
+  reliability: medium
+  default_confidence: low
+  evidence_type: media_aggregator
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: all
+- id: the_batch
+  type: rss
+  url: https://www.deeplearning.ai/the-batch/feed/
+  weight: 1.0
+  max_items: 6
+  source_tier: tier_1_high_signal
+  reliability: medium_high
+  default_confidence: medium
+  evidence_type: newsletter
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: all
+- id: import_ai
+  type: rss
+  url: https://jack-clark.net/feed/
+  weight: 0.9
+  max_items: 5
+  source_tier: tier_1_high_signal
+  reliability: medium_high
+  default_confidence: medium
+  evidence_type: newsletter
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: all
+- id: deepseek_pricing
+  type: rss
+  enabled: false
+  url: https://api-docs.deepseek.com/news
+  content_type: china_model_pricing
+  weight: 1.35
+  half_life_h: 168
+  max_items: 3
+  notes: 'stub: needs http_snapshot adapter for pricing page'
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: pricing_page
+  section_hint: Cost, Pricing & Access
+  audience_hint: developer,founder
+- id: deepseek_github_releases
+  type: rss
+  enabled: false
+  url: https://github.com/deepseek-ai/DeepSeek-V3/releases.atom
+  content_type: github_release
+  weight: 1.05
+  half_life_h: 72
+  max_items: 5
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: github_release
+  section_hint: Product & Workflow Impact
+  audience_hint: developer
+- id: qwen_github_releases
+  type: rss
+  enabled: false
+  url: https://github.com/QwenLM/Qwen3/releases.atom
+  content_type: github_release
+  weight: 1.05
+  half_life_h: 72
+  max_items: 5
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: github_release
+  section_hint: Product & Workflow Impact
+  audience_hint: developer
+- id: qwen_modelscope
+  type: rss
+  enabled: false
+  url: https://modelscope.cn/models/Qwen/rss
+  content_type: china_ecosystem_signal
+  weight: 0.8
+  half_life_h: 48
+  max_items: 5
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: low
+  evidence_type: community_signal
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: developer,researcher
+- id: volcengine_ark_docs
+  type: rss
+  enabled: false
+  content_type: china_model_docs
+  weight: 1.3
+  half_life_h: 168
+  max_items: 3
+  notes: 'stub: needs http_snapshot for ark docs changelog'
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_docs
+  section_hint: Model Capability Frontier
+  audience_hint: developer
+- id: moonshot_api_docs
+  type: rss
+  enabled: false
+  content_type: china_model_docs
+  weight: 1.3
+  half_life_h: 168
+  max_items: 3
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_docs
+  section_hint: Model Capability Frontier
+  audience_hint: developer
+- id: bigmodel_docs
+  type: rss
+  enabled: false
+  content_type: china_model_docs
+  weight: 1.3
+  half_life_h: 168
+  max_items: 3
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_docs
+  section_hint: Model Capability Frontier
+  audience_hint: developer
+- id: baidu_qianfan_docs
+  type: rss
+  enabled: false
+  content_type: china_model_docs
+  weight: 1.3
+  half_life_h: 168
+  max_items: 3
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_docs
+  section_hint: Model Capability Frontier
+  audience_hint: developer
+- id: tencent_hunyuan_docs
+  type: rss
+  enabled: false
+  content_type: china_model_docs
+  weight: 1.3
+  half_life_h: 168
+  max_items: 3
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_docs
+  section_hint: Model Capability Frontier
+  audience_hint: developer
+- id: zeroone_api_docs
+  type: rss
+  enabled: false
+  content_type: china_model_docs
+  weight: 1.3
+  half_life_h: 168
+  max_items: 3
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_docs
+  section_hint: Model Capability Frontier
+  audience_hint: developer
+- id: baichuan_api_docs
+  type: rss
+  enabled: false
+  content_type: china_model_docs
+  weight: 1.3
+  half_life_h: 168
+  max_items: 3
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_docs
+  section_hint: Model Capability Frontier
+  audience_hint: developer
+- id: siliconflow_docs
+  type: rss
+  enabled: false
+  content_type: china_ecosystem_signal
+  weight: 0.8
+  half_life_h: 48
+  max_items: 3
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: low
+  evidence_type: community_signal
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: developer,researcher
+- id: modelscope_trending
+  type: rss
+  enabled: false
+  content_type: china_ecosystem_signal
+  weight: 0.8
+  half_life_h: 48
+  max_items: 5
+  notes: 'stub: needs custom scraper for modelscope trending'
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: low
+  evidence_type: community_signal
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: developer,researcher
+- id: artificial_analysis
+  type: rss
+  enabled: false
+  content_type: benchmark_tracker
+  weight: 1.2
+  half_life_h: 72
+  max_items: 3
+  notes: 'stub: needs http_snapshot for model performance/price leaderboard'
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: benchmark_tracker
+  section_hint: Model Capability Frontier
+  audience_hint: developer,researcher
+- id: lmarena_leaderboard
+  type: rss
+  enabled: false
+  content_type: benchmark_tracker
+  weight: 1.2
+  half_life_h: 72
+  max_items: 3
+  notes: 'stub: LMSYS Chatbot Arena'
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: benchmark_tracker
+  section_hint: Model Capability Frontier
+  audience_hint: developer,researcher
+- id: livebench
+  type: rss
+  enabled: false
+  content_type: benchmark_tracker
+  weight: 1.2
+  half_life_h: 72
+  max_items: 3
+  notes: 'stub: livebench.ai'
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: benchmark_tracker
+  section_hint: Model Capability Frontier
+  audience_hint: developer,researcher
+- id: openrouter_models_pricing
+  type: rss
+  enabled: false
+  content_type: pricing_page
+  weight: 1.2
+  half_life_h: 168
+  max_items: 3
+  notes: 'stub: openrouter.ai/models — aggregate pricing API'
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: pricing_page
+  section_hint: Cost, Pricing & Access
+  audience_hint: developer,founder
+- id: nvidia_technical_blog
+  type: rss
+  url: https://developer.nvidia.com/blog/feed/
+  content_type: infra_signal
+  weight: 1.1
+  half_life_h: 120
+  max_items: 5
+  source_tier: tier_1_high_signal
+  reliability: high
+  default_confidence: medium
+  evidence_type: infra_report
+  section_hint: Capital Market & AI Infra Signals
+  audience_hint: developer,infra
+- id: vllm_releases
+  type: rss
+  enabled: false
+  url: https://github.com/vllm-project/vllm/releases.atom
+  content_type: infra_signal
+  weight: 0.9
+  half_life_h: 72
+  max_items: 3
+  source_tier: tier_1_high_signal
+  reliability: high
+  default_confidence: medium
+  evidence_type: infra_report
+  section_hint: Capital Market & AI Infra Signals
+  audience_hint: developer,infra
+- id: ollama_releases
+  type: rss
+  enabled: false
+  url: https://github.com/ollama/ollama/releases.atom
+  content_type: infra_signal
+  weight: 0.8
+  half_life_h: 72
+  max_items: 3
+  source_tier: tier_1_high_signal
+  reliability: high
+  default_confidence: medium
+  evidence_type: infra_report
+  section_hint: Capital Market & AI Infra Signals
+  audience_hint: developer,infra
+- id: the_information_ai
+  type: rss
+  enabled: false
+  url: https://www.theinformation.com/feed
+  content_type: insider_media
+  weight: 1.05
+  half_life_h: 72
+  max_items: 5
+  notes: paywalled; use snippet_only parser
+  source_tier: tier_1_high_signal
+  reliability: high
+  default_confidence: medium
+  evidence_type: insider_report
+  section_hint: Industry Strategy & Company Moves
+  audience_hint: founder,investor,market_watcher
+- id: bloomberg_ai
+  type: rss
+  enabled: false
+  url: https://feeds.bloomberg.com/technology/ai.xml
+  content_type: insider_media
+  weight: 1.05
+  half_life_h: 72
+  max_items: 5
+  source_tier: tier_1_high_signal
+  reliability: high
+  default_confidence: medium
+  evidence_type: insider_report
+  section_hint: Industry Strategy & Company Moves
+  audience_hint: founder,investor,market_watcher
+- id: axios_ai
+  type: rss
+  enabled: false
+  url: https://www.axios.com/feeds/ai-future.xml
+  content_type: insider_media
+  weight: 1.0
+  half_life_h: 72
+  max_items: 5
+  source_tier: tier_1_high_signal
+  reliability: high
+  default_confidence: medium
+  evidence_type: insider_report
+  section_hint: Industry Strategy & Company Moves
+  audience_hint: founder,investor,market_watcher
+- id: vc_a16z_ai
+  type: x_cookie
+  enabled: false
+  username: a16z
+  account_type: vc
+  content_type: vc_signal
+  weight: 0.8
+  half_life_h: 36
+  max_items: 3
+  notes: do not treat as investment advice
+  source_tier: tier_3_pulse_noise
+  reliability: medium
+  default_confidence: low
+  evidence_type: vc_signal
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: investor,founder
+- id: vc_sequoia_ai
+  type: x_cookie
+  enabled: false
+  username: sequoia
+  account_type: vc
+  content_type: vc_signal
+  weight: 0.8
+  half_life_h: 36
+  max_items: 3
+  source_tier: tier_3_pulse_noise
+  reliability: medium
+  default_confidence: low
+  evidence_type: vc_signal
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: investor,founder
+- id: builder_swyx
+  type: x_cookie
+  enabled: false
+  username: swyx
+  account_type: kol
+  content_type: builder_signal
+  weight: 0.9
+  half_life_h: 72
+  max_items: 3
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: builder_signal
+  section_hint: Product & Workflow Impact
+  audience_hint: developer
+- id: builder_lilian_weng
+  type: x_cookie
+  enabled: false
+  username: lilianweng
+  account_type: kol
+  content_type: builder_signal
+  weight: 0.9
+  half_life_h: 72
+  max_items: 3
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: builder_signal
+  section_hint: Product & Workflow Impact
+  audience_hint: developer
+- id: latent_space
+  type: rss
+  enabled: false
+  url: https://www.latent.space/feed
+  content_type: expert_newsletter
+  weight: 0.9
+  half_life_h: 96
+  max_items: 5
+  source_tier: tier_1_high_signal
+  reliability: medium_high
+  default_confidence: medium
+  evidence_type: newsletter
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: all
+- id: interconnects
+  type: rss
+  enabled: false
+  url: https://www.interconnects.ai/feed
+  content_type: expert_newsletter
+  weight: 0.9
+  half_life_h: 96
+  max_items: 5
+  source_tier: tier_1_high_signal
+  reliability: medium_high
+  default_confidence: medium
+  evidence_type: newsletter
+  section_hint: Silicon Valley / Community Pulse
+  audience_hint: all
+- id: cursor_changelog
+  type: rss
+  enabled: false
+  url: https://cursor.com/changelog/rss
+  content_type: product_changelog
+  weight: 1.0
+  half_life_h: 72
+  max_items: 3
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: product_changelog
+  section_hint: Product & Workflow Impact
+  audience_hint: developer,product
+- id: github_copilot_changelog
+  type: rss
+  enabled: false
+  url: https://github.blog/changelog/label/copilot/feed/
+  content_type: product_changelog
+  weight: 1.0
+  half_life_h: 72
+  max_items: 3
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: product_changelog
+  section_hint: Product & Workflow Impact
+  audience_hint: developer,product
