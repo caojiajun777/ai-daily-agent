@@ -318,12 +318,33 @@ def _build_ct_lookup(source_specs: list[dict]) -> dict[str, str]:
         sid = spec.get("id", "")
         if not sid:
             continue
-        # Use explicit content_type from config if present
         if "content_type" in spec:
             lookup[sid] = spec["content_type"]
         else:
             lookup[sid] = _infer_content_type(sid, spec.get("type", ""))
     return lookup
+
+
+def _build_source_meta_lookup(source_specs: list[dict]) -> dict[str, dict]:
+    """Build source_id → {tier, reliability, confidence, evidence, section}."""
+    lookup: dict[str, dict] = {}
+    for spec in source_specs:
+        sid = spec.get("id", "")
+        if not sid:
+            continue
+        lookup[sid] = {
+            "source_tier": spec.get("source_tier", ""),
+            "reliability": spec.get("reliability", ""),
+            "default_confidence": spec.get("default_confidence", "medium"),
+            "evidence_type": spec.get("evidence_type", ""),
+            "section_hint": spec.get("section_hint", ""),
+        }
+    return lookup
+
+
+def _source_field(lookup: dict[str, dict], sid: str, field: str, default: str = "") -> str:
+    """Safely read a field from the source meta lookup."""
+    return lookup.get(sid, {}).get(field, default)
 
 
 def _dup_group_id(normalized_title: str) -> str:
@@ -369,6 +390,7 @@ def curate_with_records(
     content_types_cfg is provided, falling back to legacy source_weight.
     """
     ct_lookup = _build_ct_lookup(source_specs)
+    sid_lookup = _build_source_meta_lookup(source_specs)
 
     # Build content-type parameter maps.
     ct_weights: Dict[str, float] = {}
@@ -445,6 +467,13 @@ def curate_with_records(
         if diversity_penalty < 1.0:
             reasons.append(f"diversity={diversity_penalty:.2f}")
 
+        # ── Tier/quality metadata from source config ──────────────
+        tier = _source_field(sid_lookup, it.source_id, "source_tier", "")
+        rel = _source_field(sid_lookup, it.source_id, "reliability", "")
+        conf = _source_field(sid_lookup, it.source_id, "default_confidence", "medium")
+        ev = _source_field(sid_lookup, it.source_id, "evidence_type", "")
+        sec_hint = _source_field(sid_lookup, it.source_id, "section_hint", "")
+
         curated = CuratedItem(
             title=it.title,
             url=it.url,
@@ -453,6 +482,11 @@ def curate_with_records(
             source_type=it.source_type,
             published_at=it.published_at,
             score=round(score, 4),
+            content_type=ct,
+            source_tier=tier,
+            evidence_type=ev,
+            confidence=conf,
+            section_hint=sec_hint,
         )
         record = CuratedItemRecord(
             raw_item_id=_raw_item_id(it),
@@ -465,6 +499,12 @@ def curate_with_records(
             selected_reason="; ".join(reasons) if reasons else "recency",
             duplicate_group_id=None,
             used_in_draft=True,
+            content_type=ct,
+            source_tier=tier,
+            reliability=rel,
+            confidence=conf,
+            evidence_type=ev,
+            section_hint=sec_hint,
         )
         scored.append((score, curated, record))
 
@@ -662,6 +702,7 @@ def curate_with_llm(
 ) -> Tuple[List[CuratedItem], List[CuratedItemRecord]]:
     """Curate items using LLM importance scoring + deterministic filtering."""
     ct_lookup = _build_ct_lookup(source_specs)
+    sid_lookup = _build_source_meta_lookup(source_specs)
     ct_weights: Dict[str, float] = {}
     ct_half_lives: Dict[str, float] = {}
     if content_types_cfg:
@@ -734,10 +775,18 @@ def curate_with_llm(
         if div_penalty < 1.0:
             reasons.append(f"div={div_penalty:.2f}")
 
+        tier = _source_field(sid_lookup, it.source_id, "source_tier", "")
+        rel = _source_field(sid_lookup, it.source_id, "reliability", "")
+        conf = _source_field(sid_lookup, it.source_id, "default_confidence", "medium")
+        ev = _source_field(sid_lookup, it.source_id, "evidence_type", "")
+        sec_hint = _source_field(sid_lookup, it.source_id, "section_hint", "")
+
         curated = CuratedItem(
             title=it.title, url=it.url, summary=it.summary[:500],
             source=it.source_id, source_type=it.source_type,
             published_at=it.published_at, score=round(final_score, 4),
+            content_type=ct, source_tier=tier, evidence_type=ev,
+            confidence=conf, section_hint=sec_hint,
         )
         record = CuratedItemRecord(
             raw_item_id=_raw_item_id(it), title=it.title,

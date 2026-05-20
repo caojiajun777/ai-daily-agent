@@ -61,10 +61,80 @@ def deterministic_critique(
                 if bad and bad in combined:
                     reasons.append(f"forbidden phrase present: {bad}")
 
+    # ── Tier-aware quality checks ──────────────────────────────────
+    tier_pulse_sections = {"硅谷脉搏", "社区脉搏", "Silicon Valley / Community Pulse",
+                           "业界风向", "Industry Watch", "Industry Strategy & Company Moves"}
+    investment_keywords = ["买入", "卖出", "必涨", "必跌", "稳赚", "抄底", "逃顶",
+                           "买入推荐", "卖出推荐", "目标价", "评级上调", "评级下调",
+                           "buy", "sell", "long", "short", "overweight", "underweight"]
+
+    for section in draft.sections:
+        heading = section.heading or ""
+        for item in section.items:
+            ct = getattr(item, "content_type", "")
+            tier = getattr(item, "source_tier", "")
+            ev = getattr(item, "evidence_type", "")
+            conf = getattr(item, "confidence", "")
+
+            # Tier 3 items should not appear in non-Pulse sections (only if tier set).
+            if tier and "tier_3" in tier and heading not in tier_pulse_sections:
+                if heading not in ("业界风向", "Industry Watch"):
+                    reasons.append(
+                        f"tier3_major_claim: {item.title[:60]} has tier={tier} "
+                        f"but section={heading} is not a Pulse section"
+                    )
+
+            # Missing source_tier (only flag if content_type is explicitly set).
+            if not tier and ct and ct != "tech_media":
+                reasons.append(f"missing_source_tier: {item.title[:60]} ct={ct}")
+
+            # Insider media must use reported language — check summary for
+            # official-sounding claims.
+            if ct == "insider_media" and conf == "high":
+                reasons.append(
+                    f"confidence_too_high_for_source_tier: {item.title[:60]} "
+                    f"ct={ct} tier={tier} conf={conf}"
+                )
+
+            # Tier 2/Tier 3 with high confidence (only if tier is set).
+            if tier and ("tier_2" in tier or "tier_3" in tier) and conf == "high":
+                reasons.append(
+                    f"confidence_too_high_for_source_tier: {item.title[:60]} "
+                    f"tier={tier} conf={conf}"
+                )
+
+            # Market items must not contain investment advice.
+            if ct in ("market_commentary", "vc_signal") or ev in ("market_commentary",):
+                for kw in investment_keywords:
+                    if kw in item.summary or kw in item.title:
+                        reasons.append(
+                            f"market_investment_advice: {item.title[:60]} "
+                            f"contains '{kw}'"
+                        )
+                        break
+
+            # Pricing items require official pricing/docs source.
+            price_ev_types = {"pricing_page", "china_model_pricing", "china_model_docs",
+                              "official_docs", "official_release"}
+            if heading and "price" in heading.lower() and heading and "cost" in heading.lower():
+                if ev not in price_ev_types and ct not in ("pricing_page", "china_model_pricing"):
+                    reasons.append(
+                        f"pricing_without_official_source: {item.title[:60]} "
+                        f"ev={ev} ct={ct}"
+                    )
+
+    quality_flags = [r for r in reasons if any(
+        kw in r for kw in ["tier3_major_claim", "missing_source_tier",
+                           "confidence_too_high", "market_investment_advice",
+                           "pricing_without_official_source"])
+    ]
+
     if reasons:
-        return CritiqueResult(verdict="reject", reasons=reasons, score=0)
+        return CritiqueResult(verdict="reject", reasons=reasons, score=0,
+                             quality_flags=quality_flags)
     score = max(0, 100 - len(reasons) * 10)
-    return CritiqueResult(verdict="pass", reasons=[], score=score)
+    return CritiqueResult(verdict="pass", reasons=[], score=score,
+                         quality_flags=[])
 
 
 def llm_critique(

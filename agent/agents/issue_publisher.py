@@ -125,6 +125,15 @@ def evaluate_publish_gate(
         # Forward critic-detected issues for visibility.
         for r in (critique_stage.get("meta") or {}).get("reasons") or []:
             reasons.append(f"critic: {r}")
+        # Quality flags from tier-aware checks.
+        quality_flags = (critique_stage.get("meta") or {}).get("quality_flags") or []
+        for qf in quality_flags:
+            if any(kw in qf for kw in [
+                "tier3_major_claim", "pricing_without_official_source",
+                "benchmark_without_benchmark_source", "market_investment_advice",
+                "confidence_too_high_for_source_tier",
+            ]):
+                reasons.append(f"quality_flag: {qf}")
 
     eval_stage = stages.get("eval", {}) or {}
     eval_meta = eval_stage.get("meta") or {}

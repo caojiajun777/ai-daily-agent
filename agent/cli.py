@@ -157,6 +157,30 @@ def cmd_eval(args: argparse.Namespace) -> int:
         except Exception:
             pass
 
+    # Source quality distribution (if curated records available).
+    if curated_records:
+        from collections import Counter
+        tiers = Counter(getattr(r, "source_tier", "?") or "?" for r in curated_records)
+        cts = Counter(getattr(r, "content_type", "?") or "?" for r in curated_records)
+        total = len(curated_records)
+        tier0 = tiers.get("tier_0_core_evidence", 0)
+        tier1 = tiers.get("tier_1_high_signal", 0)
+        high_non_tier0 = sum(
+            1 for r in curated_records
+            if getattr(r, "confidence", "medium") == "high"
+            and "tier_0" not in (getattr(r, "source_tier", "") or "")
+        )
+        metrics["source_quality"] = {
+            "item_count_by_source_tier": dict(tiers),
+            "item_count_by_content_type": dict(cts),
+            "tier0_item_ratio": round(tier0 / total, 3) if total else 0,
+            "tier0_tier1_item_ratio": round((tier0 + tier1) / total, 3) if total else 0,
+            "tier3_item_count": sum(
+                1 for k, v in tiers.items() if "tier_3" in k
+            ),
+            "high_confidence_non_tier0_count": high_non_tier0,
+        }
+
     print(json.dumps(metrics, ensure_ascii=False, indent=2))
     return 0 if metrics["ok"] else 1
 

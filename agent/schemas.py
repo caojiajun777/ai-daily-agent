@@ -15,6 +15,11 @@ class CuratedItem(BaseModel):
     source_type: str
     published_at: str = ""
     score: float = 0.0
+    content_type: str = "tech_media"
+    source_tier: str = ""
+    evidence_type: str = ""
+    confidence: str = "medium"
+    section_hint: str = ""
 
 
 class DraftItem(BaseModel):
@@ -25,6 +30,10 @@ class DraftItem(BaseModel):
     image_url: str = ""                          # extracted og:image from source
     highlights: List[str] = []                   # 2-4 key takeaway bullets
     related_links: List[str] = []                # additional reference URLs
+    content_type: str = "tech_media"
+    source_tier: str = ""
+    evidence_type: str = ""
+    confidence: str = "medium"
 
 
 class DraftSection(BaseModel):
@@ -44,6 +53,7 @@ class CritiqueResult(BaseModel):
     verdict: str  # "pass" | "reject"
     reasons: List[str] = []
     score: int = 0
+    quality_flags: List[str] = []
 
 
 class CuratedItemRecord(BaseModel):
@@ -59,6 +69,12 @@ class CuratedItemRecord(BaseModel):
     selected_reason: str
     duplicate_group_id: Optional[str] = None
     used_in_draft: bool = True
+    content_type: str = "tech_media"
+    source_tier: str = ""
+    reliability: str = ""
+    confidence: str = "medium"
+    evidence_type: str = ""
+    section_hint: str = ""
 
 
 class CuratedOutput(BaseModel):
