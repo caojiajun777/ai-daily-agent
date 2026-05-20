@@ -173,6 +173,59 @@ class HeatChange(BaseModel):
     evidence_event_ids: List[str] = []
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# Pricing Snapshot Layer schemas
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class PricingModelRecord(BaseModel):
+    provider: str = ""
+    model: str = ""
+    input_price_per_m: Optional[float] = None
+    output_price_per_m: Optional[float] = None
+    cache_hit_price_per_m: Optional[float] = None
+    cache_write_price_per_m: Optional[float] = None
+    context_window: Optional[int] = None
+    currency: str = "USD"
+    billing_unit: Optional[str] = None
+    source_url: str = ""
+    observed_at: str = ""
+    notes: str = ""
+
+
+class PricingProviderSnapshot(BaseModel):
+    provider: str = ""
+    source_id: str = ""
+    source_url: str = ""
+    observed_at: str = ""
+    models: list[PricingModelRecord] = []
+    content_hash: str = ""
+
+
+class PricingSnapshot(BaseModel):
+    date: str = ""
+    run_id: str = ""
+    providers: list[PricingProviderSnapshot] = []
+
+
+class PricingChange(BaseModel):
+    provider: str = ""
+    model: str = ""
+    field: str = ""
+    old: Optional[float] = None
+    new: Optional[float] = None
+    change_type: str = "price_decrease"  # price_increase | price_decrease | new_model | removed_model | context_change | metadata_change
+    source_url: str = ""
+
+
+class PricingDiff(BaseModel):
+    date: str = ""
+    run_id: str = ""
+    previous_date: Optional[str] = None
+    has_changes: bool = False
+    changes: list[PricingChange] = []
+
+
 class TrendReport(BaseModel):
     report_id: str = ""
     generated_at: str = ""

@@ -879,7 +879,84 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_verify.set_defaults(func=cmd_verify_gitblog)
 
+    p_pricing = sub.add_parser(
+        "pricing-snapshot",
+        help="snapshot model pricing and compute diff vs previous",
+    )
+    p_pricing.add_argument("--date", default=None)
+    p_pricing.add_argument("--config", default=None)
+    p_pricing.add_argument("--artifacts", default="artifacts")
+    p_pricing.add_argument(
+        "--json", action="store_true", help="machine-readable output"
+    )
+    p_pricing.set_defaults(func=cmd_pricing_snapshot)
+
     return parser
+
+
+def cmd_pricing_snapshot(args: argparse.Namespace) -> int:
+    """Snapshot model pricing and compute diff."""
+    from agent.sources.pricing_snapshot import snapshot_pricing
+    import json as _json, os as _os
+
+    cfg = load_yaml(args.config or CFG_PATH)
+    sources = cfg.get("sources", [])
+    pricing_sources = [
+        s for s in sources
+        if isinstance(s, dict)
+        and s.get("parser_strategy") in ("static_config", "http_snapshot_stub")
+        and s.get("enabled", True)
+    ]
+
+    if not pricing_sources:
+        print("No enabled pricing sources found")
+        return 0
+
+    date = args.date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    artifacts = args.artifacts or "artifacts"
+
+    snapshot, diff = snapshot_pricing(
+        source_specs=pricing_sources,
+        artifacts_root=artifacts,
+        date=date,
+        run_id=f"pricing-{date}",
+    )
+
+    # Write snapshot.
+    pricing_dir = _os.path.join(artifacts, "pricing")
+    _os.makedirs(pricing_dir, exist_ok=True)
+    snap_path = _os.path.join(pricing_dir, f"{date}.json")
+    with open(snap_path, "w", encoding="utf-8") as f:
+        _json.dump(snapshot.model_dump(), f, ensure_ascii=False, indent=2)
+
+    diff_path = None
+    change_count = 0
+    has_changes = False
+    if diff:
+        diff_path = _os.path.join(pricing_dir, f"diff_{date}.json")
+        with open(diff_path, "w", encoding="utf-8") as f:
+            _json.dump(diff.model_dump(), f, ensure_ascii=False, indent=2)
+        change_count = len(diff.changes)
+        has_changes = diff.has_changes
+
+    models_count = sum(len(p.models) for p in snapshot.providers)
+
+    if args.json:
+        print(_json.dumps({
+            "date": date,
+            "snapshot_path": snap_path,
+            "diff_path": diff_path,
+            "providers_count": len(snapshot.providers),
+            "models_count": models_count,
+            "changes_count": change_count,
+            "has_changes": has_changes,
+        }, ensure_ascii=False, indent=2))
+    else:
+        print(f"Pricing snapshot: {len(snapshot.providers)} providers, {models_count} models")
+        if diff:
+            print(f"Diff: {change_count} changes, has_changes={has_changes}")
+
+    return 0 if not has_changes else 0
 
 
 def main(argv: Optional[list] = None) -> int:

@@ -819,8 +819,8 @@ sources:
   section_hint: Silicon Valley / Community Pulse
   audience_hint: all
 - id: deepseek_pricing
-  type: rss
-  enabled: false
+  type: pricing_snapshot
+  enabled: true
   url: https://api-docs.deepseek.com/news
   content_type: china_model_pricing
   weight: 1.35
@@ -833,9 +833,30 @@ sources:
   evidence_type: pricing_page
   section_hint: Cost, Pricing & Access
   audience_hint: developer,founder
+  parser_strategy: static_config
+  provider: deepseek
+  source_url: https://api-docs.deepseek.com/quick_start/pricing
+  pricing_records:
+  - model: deepseek-chat
+    input_price_per_m: 0.27
+    cache_hit_price_per_m: 0.07
+    currency: USD
+    notes: cache miss default
+  - model: deepseek-chat
+    input_price_per_m: 0.07
+    currency: USD
+    notes: cache hit
+  - model: deepseek-v4-pro
+    input_price_per_m: 0.14
+    output_price_per_m: 0.28
+    currency: USD
+  - model: deepseek-v4-flash
+    input_price_per_m: 0.07
+    output_price_per_m: 0.14
+    currency: USD
 - id: deepseek_github_releases
   type: rss
-  enabled: false
+  enabled: true
   url: https://github.com/deepseek-ai/DeepSeek-V3/releases.atom
   content_type: github_release
   weight: 1.05
@@ -847,9 +868,15 @@ sources:
   evidence_type: github_release
   section_hint: Product & Workflow Impact
   audience_hint: developer
+  parser_strategy: rss
+  repair_action: 'enabled: valid GitHub releases RSS'
+  can_enable_now: true
+  required_adapter: rss
+  token_risk: low
+  reliability_risk: low
 - id: qwen_github_releases
   type: rss
-  enabled: false
+  enabled: true
   url: https://github.com/QwenLM/Qwen3/releases.atom
   content_type: github_release
   weight: 1.05
@@ -861,6 +888,12 @@ sources:
   evidence_type: github_release
   section_hint: Product & Workflow Impact
   audience_hint: developer
+  parser_strategy: rss
+  repair_action: 'enabled: valid GitHub releases RSS'
+  can_enable_now: true
+  required_adapter: rss
+  token_risk: low
+  reliability_risk: low
 - id: qwen_modelscope
   type: rss
   enabled: false
@@ -875,6 +908,14 @@ sources:
   evidence_type: community_signal
   section_hint: Silicon Valley / Community Pulse
   audience_hint: developer,researcher
+  disabled_reason: URL unverified; likely requires custom scraper
+  repair_action: verify Modelscope URL or implement scraper before enabling
+  can_enable_now: false
+  required_adapter: modelscope_scraper
+  parser_strategy: custom_scraper
+  adapter_stub: true
+  token_risk: medium
+  reliability_risk: medium
 - id: volcengine_ark_docs
   type: rss
   enabled: false
@@ -889,6 +930,14 @@ sources:
   evidence_type: official_docs
   section_hint: Model Capability Frontier
   audience_hint: developer
+  disabled_reason: missing stable URL; requires docs snapshot adapter
+  repair_action: find official docs URL and implement adapter before enabling
+  can_enable_now: false
+  required_adapter: docs_snapshot_adapter
+  parser_strategy: docs_snapshot
+  adapter_stub: true
+  token_risk: low
+  reliability_risk: medium
 - id: moonshot_api_docs
   type: rss
   enabled: false
@@ -902,6 +951,14 @@ sources:
   evidence_type: official_docs
   section_hint: Model Capability Frontier
   audience_hint: developer
+  disabled_reason: missing stable URL; requires docs snapshot adapter
+  repair_action: find official docs URL and implement adapter before enabling
+  can_enable_now: false
+  required_adapter: docs_snapshot_adapter
+  parser_strategy: docs_snapshot
+  adapter_stub: true
+  token_risk: low
+  reliability_risk: medium
 - id: bigmodel_docs
   type: rss
   enabled: false
@@ -915,6 +972,14 @@ sources:
   evidence_type: official_docs
   section_hint: Model Capability Frontier
   audience_hint: developer
+  disabled_reason: missing stable URL; requires docs snapshot adapter
+  repair_action: find official docs URL and implement adapter before enabling
+  can_enable_now: false
+  required_adapter: docs_snapshot_adapter
+  parser_strategy: docs_snapshot
+  adapter_stub: true
+  token_risk: low
+  reliability_risk: medium
 - id: baidu_qianfan_docs
   type: rss
   enabled: false
@@ -928,6 +993,14 @@ sources:
   evidence_type: official_docs
   section_hint: Model Capability Frontier
   audience_hint: developer
+  disabled_reason: missing stable URL; requires docs snapshot adapter
+  repair_action: find official docs URL and implement adapter before enabling
+  can_enable_now: false
+  required_adapter: docs_snapshot_adapter
+  parser_strategy: docs_snapshot
+  adapter_stub: true
+  token_risk: low
+  reliability_risk: medium
 - id: tencent_hunyuan_docs
   type: rss
   enabled: false
@@ -941,6 +1014,14 @@ sources:
   evidence_type: official_docs
   section_hint: Model Capability Frontier
   audience_hint: developer
+  disabled_reason: missing stable URL; requires docs snapshot adapter
+  repair_action: find official docs URL and implement adapter before enabling
+  can_enable_now: false
+  required_adapter: docs_snapshot_adapter
+  parser_strategy: docs_snapshot
+  adapter_stub: true
+  token_risk: low
+  reliability_risk: medium
 - id: zeroone_api_docs
   type: rss
   enabled: false
@@ -954,6 +1035,14 @@ sources:
   evidence_type: official_docs
   section_hint: Model Capability Frontier
   audience_hint: developer
+  disabled_reason: missing stable URL; requires docs snapshot adapter
+  repair_action: find official docs URL and implement adapter before enabling
+  can_enable_now: false
+  required_adapter: docs_snapshot_adapter
+  parser_strategy: docs_snapshot
+  adapter_stub: true
+  token_risk: low
+  reliability_risk: medium
 - id: baichuan_api_docs
   type: rss
   enabled: false
@@ -967,6 +1056,14 @@ sources:
   evidence_type: official_docs
   section_hint: Model Capability Frontier
   audience_hint: developer
+  disabled_reason: missing stable URL; requires docs snapshot adapter
+  repair_action: find official docs URL and implement adapter before enabling
+  can_enable_now: false
+  required_adapter: docs_snapshot_adapter
+  parser_strategy: docs_snapshot
+  adapter_stub: true
+  token_risk: low
+  reliability_risk: medium
 - id: siliconflow_docs
   type: rss
   enabled: false
@@ -974,12 +1071,20 @@ sources:
   weight: 0.8
   half_life_h: 48
   max_items: 3
-  source_tier: tier_2_context_signal
-  reliability: medium
-  default_confidence: low
-  evidence_type: community_signal
-  section_hint: Silicon Valley / Community Pulse
-  audience_hint: developer,researcher
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_docs
+  section_hint: Model Capability Frontier
+  audience_hint: developer
+  disabled_reason: missing stable URL; requires docs snapshot adapter
+  repair_action: find official docs URL and implement adapter before enabling
+  can_enable_now: false
+  required_adapter: docs_snapshot_adapter
+  parser_strategy: docs_snapshot
+  adapter_stub: true
+  token_risk: low
+  reliability_risk: medium
 - id: modelscope_trending
   type: rss
   enabled: false
@@ -994,6 +1099,14 @@ sources:
   evidence_type: community_signal
   section_hint: Silicon Valley / Community Pulse
   audience_hint: developer,researcher
+  disabled_reason: requires custom scraper; no stable API yet
+  repair_action: implement ModelScope scraper before enabling
+  can_enable_now: false
+  required_adapter: modelscope_scraper
+  parser_strategy: custom_scraper
+  adapter_stub: true
+  token_risk: medium
+  reliability_risk: medium
 - id: artificial_analysis
   type: rss
   enabled: false
@@ -1007,7 +1120,16 @@ sources:
   default_confidence: high
   evidence_type: benchmark_tracker
   section_hint: Model Capability Frontier
-  audience_hint: developer,researcher
+  audience_hint: developer,researcher,founder
+  disabled_reason: requires leaderboard snapshot adapter; should not be treated as
+    RSS
+  repair_action: implement benchmark_tracker_adapter before enabling
+  can_enable_now: false
+  required_adapter: benchmark_tracker_adapter
+  parser_strategy: leaderboard_snapshot
+  adapter_stub: true
+  token_risk: low
+  reliability_risk: low
 - id: lmarena_leaderboard
   type: rss
   enabled: false
@@ -1021,7 +1143,15 @@ sources:
   default_confidence: high
   evidence_type: benchmark_tracker
   section_hint: Model Capability Frontier
-  audience_hint: developer,researcher
+  audience_hint: developer,researcher,founder
+  disabled_reason: requires leaderboard snapshot adapter
+  repair_action: implement benchmark_tracker_adapter before enabling
+  can_enable_now: false
+  required_adapter: benchmark_tracker_adapter
+  parser_strategy: leaderboard_snapshot
+  adapter_stub: true
+  token_risk: low
+  reliability_risk: low
 - id: livebench
   type: rss
   enabled: false
@@ -1035,7 +1165,15 @@ sources:
   default_confidence: high
   evidence_type: benchmark_tracker
   section_hint: Model Capability Frontier
-  audience_hint: developer,researcher
+  audience_hint: developer,researcher,founder
+  disabled_reason: requires leaderboard snapshot adapter
+  repair_action: implement benchmark_tracker_adapter before enabling
+  can_enable_now: false
+  required_adapter: benchmark_tracker_adapter
+  parser_strategy: leaderboard_snapshot
+  adapter_stub: true
+  token_risk: low
+  reliability_risk: low
 - id: openrouter_models_pricing
   type: rss
   enabled: false
@@ -1050,6 +1188,14 @@ sources:
   evidence_type: pricing_page
   section_hint: Cost, Pricing & Access
   audience_hint: developer,founder
+  disabled_reason: requires pricing snapshot adapter; should not be treated as RSS
+  repair_action: implement pricing_snapshot_adapter before enabling
+  can_enable_now: false
+  required_adapter: pricing_snapshot_adapter
+  parser_strategy: pricing_snapshot
+  adapter_stub: true
+  token_risk: low
+  reliability_risk: low
 - id: nvidia_technical_blog
   type: rss
   url: https://developer.nvidia.com/blog/feed/
@@ -1065,7 +1211,7 @@ sources:
   audience_hint: developer,infra
 - id: vllm_releases
   type: rss
-  enabled: false
+  enabled: true
   url: https://github.com/vllm-project/vllm/releases.atom
   content_type: infra_signal
   weight: 0.9
@@ -1073,13 +1219,19 @@ sources:
   max_items: 3
   source_tier: tier_1_high_signal
   reliability: high
-  default_confidence: medium
-  evidence_type: infra_report
+  default_confidence: high
+  evidence_type: github_release
   section_hint: Capital Market & AI Infra Signals
   audience_hint: developer,infra
+  parser_strategy: rss
+  repair_action: 'enabled: valid GitHub releases RSS'
+  can_enable_now: true
+  required_adapter: rss
+  token_risk: low
+  reliability_risk: low
 - id: ollama_releases
   type: rss
-  enabled: false
+  enabled: true
   url: https://github.com/ollama/ollama/releases.atom
   content_type: infra_signal
   weight: 0.8
@@ -1087,28 +1239,40 @@ sources:
   max_items: 3
   source_tier: tier_1_high_signal
   reliability: high
-  default_confidence: medium
-  evidence_type: infra_report
+  default_confidence: high
+  evidence_type: github_release
   section_hint: Capital Market & AI Infra Signals
   audience_hint: developer,infra
+  parser_strategy: rss
+  repair_action: 'enabled: valid GitHub releases RSS'
+  can_enable_now: true
+  required_adapter: rss
+  token_risk: low
+  reliability_risk: low
 - id: the_information_ai
   type: rss
-  enabled: false
+  enabled: true
   url: https://www.theinformation.com/feed
   content_type: insider_media
   weight: 1.05
   half_life_h: 72
   max_items: 5
-  notes: paywalled; use snippet_only parser
+  notes: Use reported language. Do not treat as official confirmation. Paywalled.
   source_tier: tier_1_high_signal
   reliability: high
   default_confidence: medium
   evidence_type: insider_report
   section_hint: Industry Strategy & Company Moves
   audience_hint: founder,investor,market_watcher
+  parser_strategy: snippet_only
+  repair_action: enabled as insider_media with reported-language constraint
+  can_enable_now: true
+  required_adapter: rss
+  token_risk: low
+  reliability_risk: low
 - id: bloomberg_ai
   type: rss
-  enabled: false
+  enabled: true
   url: https://feeds.bloomberg.com/technology/ai.xml
   content_type: insider_media
   weight: 1.05
@@ -1120,9 +1284,16 @@ sources:
   evidence_type: insider_report
   section_hint: Industry Strategy & Company Moves
   audience_hint: founder,investor,market_watcher
+  parser_strategy: rss
+  repair_action: enabled as insider_media; feed URL unverified
+  can_enable_now: true
+  required_adapter: rss
+  token_risk: low
+  reliability_risk: medium
+  notes: Use reported language. Feed URL unverified.
 - id: axios_ai
   type: rss
-  enabled: false
+  enabled: true
   url: https://www.axios.com/feeds/ai-future.xml
   content_type: insider_media
   weight: 1.0
@@ -1134,6 +1305,13 @@ sources:
   evidence_type: insider_report
   section_hint: Industry Strategy & Company Moves
   audience_hint: founder,investor,market_watcher
+  parser_strategy: rss
+  repair_action: enabled as insider_media; feed URL unverified
+  can_enable_now: true
+  required_adapter: rss
+  token_risk: low
+  reliability_risk: medium
+  notes: Use reported language. Feed URL unverified.
 - id: vc_a16z_ai
   type: x_cookie
   enabled: false
@@ -1144,12 +1322,20 @@ sources:
   half_life_h: 36
   max_items: 3
   notes: do not treat as investment advice
-  source_tier: tier_3_pulse_noise
+  source_tier: tier_2_context_signal
   reliability: medium
   default_confidence: low
   evidence_type: vc_signal
   section_hint: Silicon Valley / Community Pulse
   audience_hint: investor,founder
+  disabled_reason: kept disabled until Silicon Valley Pulse policy and handle verification
+    complete
+  repair_action: enable after handle verification and Pulse policy
+  can_enable_now: false
+  required_adapter: x_cookie
+  parser_strategy: x_cookie
+  token_risk: low
+  reliability_risk: high
 - id: vc_sequoia_ai
   type: x_cookie
   enabled: false
@@ -1159,12 +1345,20 @@ sources:
   weight: 0.8
   half_life_h: 36
   max_items: 3
-  source_tier: tier_3_pulse_noise
+  source_tier: tier_2_context_signal
   reliability: medium
   default_confidence: low
   evidence_type: vc_signal
   section_hint: Silicon Valley / Community Pulse
   audience_hint: investor,founder
+  disabled_reason: kept disabled until Silicon Valley Pulse policy and handle verification
+    complete
+  repair_action: enable after handle verification and Pulse policy
+  can_enable_now: false
+  required_adapter: x_cookie
+  parser_strategy: x_cookie
+  token_risk: low
+  reliability_risk: high
 - id: builder_swyx
   type: x_cookie
   enabled: false
@@ -1180,6 +1374,13 @@ sources:
   evidence_type: builder_signal
   section_hint: Product & Workflow Impact
   audience_hint: developer
+  disabled_reason: kept disabled until handle verification complete
+  repair_action: enable after handle verification
+  can_enable_now: false
+  required_adapter: x_cookie
+  parser_strategy: x_cookie
+  token_risk: low
+  reliability_risk: medium
 - id: builder_lilian_weng
   type: x_cookie
   enabled: false
@@ -1195,9 +1396,16 @@ sources:
   evidence_type: builder_signal
   section_hint: Product & Workflow Impact
   audience_hint: developer
+  disabled_reason: kept disabled until handle verification complete
+  repair_action: enable after handle verification
+  can_enable_now: false
+  required_adapter: x_cookie
+  parser_strategy: x_cookie
+  token_risk: low
+  reliability_risk: medium
 - id: latent_space
   type: rss
-  enabled: false
+  enabled: true
   url: https://www.latent.space/feed
   content_type: expert_newsletter
   weight: 0.9
@@ -1209,9 +1417,15 @@ sources:
   evidence_type: newsletter
   section_hint: Silicon Valley / Community Pulse
   audience_hint: all
+  parser_strategy: rss
+  repair_action: 'enabled: valid newsletter RSS'
+  can_enable_now: true
+  required_adapter: rss
+  token_risk: low
+  reliability_risk: low
 - id: interconnects
   type: rss
-  enabled: false
+  enabled: true
   url: https://www.interconnects.ai/feed
   content_type: expert_newsletter
   weight: 0.9
@@ -1223,9 +1437,15 @@ sources:
   evidence_type: newsletter
   section_hint: Silicon Valley / Community Pulse
   audience_hint: all
+  parser_strategy: rss
+  repair_action: 'enabled: valid newsletter RSS'
+  can_enable_now: true
+  required_adapter: rss
+  token_risk: low
+  reliability_risk: low
 - id: cursor_changelog
   type: rss
-  enabled: false
+  enabled: true
   url: https://cursor.com/changelog/rss
   content_type: product_changelog
   weight: 1.0
@@ -1237,9 +1457,15 @@ sources:
   evidence_type: product_changelog
   section_hint: Product & Workflow Impact
   audience_hint: developer,product
+  parser_strategy: rss
+  repair_action: 'enabled: valid changelog RSS'
+  can_enable_now: true
+  required_adapter: rss
+  token_risk: low
+  reliability_risk: low
 - id: github_copilot_changelog
   type: rss
-  enabled: false
+  enabled: true
   url: https://github.blog/changelog/label/copilot/feed/
   content_type: product_changelog
   weight: 1.0
@@ -1251,3 +1477,153 @@ sources:
   evidence_type: product_changelog
   section_hint: Product & Workflow Impact
   audience_hint: developer,product
+  parser_strategy: rss
+  repair_action: 'enabled: valid changelog RSS'
+  can_enable_now: true
+  required_adapter: rss
+  token_risk: low
+  reliability_risk: low
+- id: openai_pricing
+  type: pricing_snapshot
+  enabled: false
+  content_type: pricing_page
+  source_tier: tier_0_core_evidence
+  evidence_type: pricing_page
+  provider: openai
+  source_url: https://openai.com/api/pricing/
+  parser_strategy: pricing_snapshot
+  section_hint: Cost, Pricing & Access
+  audience_hint: developer,founder
+  reliability: high
+  default_confidence: high
+  notes: 'stub: needs real pricing parser'
+  disabled_reason: requires pricing snapshot adapter; should not be treated as RSS
+  repair_action: implement pricing_snapshot_adapter before enabling
+  can_enable_now: false
+  required_adapter: pricing_snapshot_adapter
+  adapter_stub: true
+  token_risk: low
+  reliability_risk: low
+- id: anthropic_pricing
+  type: pricing_snapshot
+  enabled: false
+  content_type: pricing_page
+  source_tier: tier_0_core_evidence
+  evidence_type: pricing_page
+  provider: anthropic
+  source_url: https://www.anthropic.com/pricing
+  parser_strategy: pricing_snapshot
+  section_hint: Cost, Pricing & Access
+  audience_hint: developer,founder
+  reliability: high
+  default_confidence: high
+  notes: 'stub: needs real pricing parser'
+  disabled_reason: requires pricing snapshot adapter; should not be treated as RSS
+  repair_action: implement pricing_snapshot_adapter before enabling
+  can_enable_now: false
+  required_adapter: pricing_snapshot_adapter
+  adapter_stub: true
+  token_risk: low
+  reliability_risk: low
+- id: google_gemini_pricing
+  type: pricing_snapshot
+  enabled: false
+  content_type: pricing_page
+  source_tier: tier_0_core_evidence
+  evidence_type: pricing_page
+  provider: google
+  source_url: https://ai.google.dev/pricing
+  parser_strategy: pricing_snapshot
+  section_hint: Cost, Pricing & Access
+  audience_hint: developer,founder
+  reliability: high
+  default_confidence: high
+  disabled_reason: requires pricing snapshot adapter; should not be treated as RSS
+  repair_action: implement pricing_snapshot_adapter before enabling
+  can_enable_now: false
+  required_adapter: pricing_snapshot_adapter
+  adapter_stub: true
+  token_risk: low
+  reliability_risk: low
+- id: qwen_dashscope_pricing
+  type: pricing_snapshot
+  enabled: false
+  content_type: china_model_pricing
+  source_tier: tier_0_core_evidence
+  evidence_type: pricing_page
+  provider: qwen
+  source_url: https://help.aliyun.com/zh/model-studio
+  parser_strategy: pricing_snapshot
+  section_hint: Cost, Pricing & Access
+  audience_hint: developer,founder
+  reliability: high
+  default_confidence: high
+  notes: Aliyun DashScope/Model Studio pricing
+  disabled_reason: requires pricing snapshot adapter
+  repair_action: implement pricing_snapshot_adapter before enabling
+  can_enable_now: false
+  required_adapter: pricing_snapshot_adapter
+  adapter_stub: true
+  token_risk: low
+  reliability_risk: low
+- id: volcengine_ark_pricing
+  type: pricing_snapshot
+  enabled: false
+  content_type: china_model_pricing
+  source_tier: tier_0_core_evidence
+  evidence_type: pricing_page
+  provider: bytedance
+  source_url: https://www.volcengine.com/docs/82379/1099320
+  parser_strategy: pricing_snapshot
+  section_hint: Cost, Pricing & Access
+  audience_hint: developer,founder
+  reliability: high
+  default_confidence: high
+  notes: Volcengine Ark pricing
+  disabled_reason: requires pricing snapshot adapter
+  repair_action: implement pricing_snapshot_adapter before enabling
+  can_enable_now: false
+  required_adapter: pricing_snapshot_adapter
+  adapter_stub: true
+  token_risk: low
+  reliability_risk: low
+- id: moonshot_pricing
+  type: pricing_snapshot
+  enabled: false
+  content_type: china_model_pricing
+  source_tier: tier_0_core_evidence
+  evidence_type: pricing_page
+  provider: moonshot
+  source_url: https://platform.moonshot.cn/docs/pricing
+  parser_strategy: pricing_snapshot
+  section_hint: Cost, Pricing & Access
+  audience_hint: developer,founder
+  reliability: high
+  default_confidence: high
+  disabled_reason: requires pricing snapshot adapter
+  repair_action: implement pricing_snapshot_adapter before enabling
+  can_enable_now: false
+  required_adapter: pricing_snapshot_adapter
+  adapter_stub: true
+  token_risk: low
+  reliability_risk: low
+- id: bigmodel_pricing
+  type: pricing_snapshot
+  enabled: false
+  content_type: china_model_pricing
+  source_tier: tier_0_core_evidence
+  evidence_type: pricing_page
+  provider: zhipu
+  source_url: https://open.bigmodel.cn/pricing
+  parser_strategy: pricing_snapshot
+  section_hint: Cost, Pricing & Access
+  audience_hint: developer,founder
+  reliability: high
+  default_confidence: high
+  disabled_reason: requires pricing snapshot adapter
+  repair_action: implement pricing_snapshot_adapter before enabling
+  can_enable_now: false
+  required_adapter: pricing_snapshot_adapter
+  adapter_stub: true
+  token_risk: low
+  reliability_risk: low
