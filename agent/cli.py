@@ -891,7 +891,131 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_pricing.set_defaults(func=cmd_pricing_snapshot)
 
+    p_src_resolve = sub.add_parser(
+        "source-resolve",
+        help="auto-diagnose and fix disabled sources: find URLs, validate, apply-safe",
+    )
+    p_src_resolve.add_argument("--source-id", default=None)
+    p_src_resolve.add_argument("--config", default=None)
+    p_src_resolve.add_argument("--artifacts", default="artifacts")
+    p_src_resolve.add_argument(
+        "--dry-run", action="store_true",
+        help="preview only, write resolution report without modifying config",
+    )
+    p_src_resolve.add_argument(
+        "--apply-safe", action="store_true",
+        help="apply only low-risk fixes (valid RSS/GitHub releases)",
+    )
+    p_src_resolve.add_argument(
+        "--force", action="store_true",
+        help="overwrite existing URLs even if already set",
+    )
+    p_src_resolve.add_argument(
+        "--json", action="store_true", help="machine-readable output"
+    )
+    p_src_resolve.set_defaults(func=cmd_source_resolve)
+
     return parser
+
+
+def cmd_source_resolve(args: argparse.Namespace) -> int:
+    """Auto-diagnose and repair disabled sources."""
+    from agent.tools.source_resolver import (
+        resolve_all_disabled, resolve_source,
+        apply_safe_resolutions, apply_non_enable_fixes,
+        SourceResolutionReport,
+    )
+    import json as _json, os as _os
+
+    cfg = load_yaml(args.config or CFG_PATH)
+    sources = cfg.get("sources", [])
+
+    if args.source_id:
+        target = next((s for s in sources if isinstance(s, dict) and s["id"] == args.source_id), None)
+        if not target:
+            print(f"Source not found: {args.source_id}", file=sys.stderr)
+            return 2
+        result = resolve_source(target)
+        if args.json:
+            print(_json.dumps(_result_to_dict(result), ensure_ascii=False, indent=2))
+        else:
+            print(f"  Source: {result.source_id}")
+            print(f"  Status: {result.status}")
+            print(f"  Selected URL: {result.selected_url}")
+            print(f"  Recommend enabled: {result.recommended_enabled}")
+            print(f"  Risk: {result.risk_level}")
+            print(f"  Reason: {result.reason}")
+        return 0
+
+    report = resolve_all_disabled(sources)
+
+    # Write report
+    artifacts = args.artifacts or "artifacts"
+    reports_dir = _os.path.join(artifacts, "reports")
+    _os.makedirs(reports_dir, exist_ok=True)
+    date = report.date
+    report_path = _os.path.join(reports_dir, f"source_resolution_{date}.json")
+    with open(report_path, "w", encoding="utf-8") as f:
+        _json.dump({
+            "date": date,
+            "total_checked": report.total_checked,
+            "resolved_enable_safe": report.resolved_enable_safe,
+            "candidate_found_needs_adapter": report.candidate_found_needs_adapter,
+            "candidate_found_needs_review": report.candidate_found_needs_review,
+            "no_candidate_found": report.no_candidate_found,
+            "invalid_existing_url": report.invalid_existing_url,
+            "ambiguous_candidates": report.ambiguous_candidates,
+            "results": [_result_to_dict(r) for r in report.results],
+        }, f, ensure_ascii=False, indent=2)
+
+    if args.apply_safe:
+        sources = apply_safe_resolutions(sources, report, force=args.force)
+        sources = apply_non_enable_fixes(sources, report, force=args.force)
+        cfg["sources"] = sources
+        with open(args.config or CFG_PATH, "w", encoding="utf-8") as f:
+            yaml.dump(cfg, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        print(f"Applied safe fixes to config")
+
+    if args.json:
+        print(_json.dumps({
+            "date": date,
+            "report_path": report_path,
+            "total_checked": report.total_checked,
+            "resolved_enable_safe": report.resolved_enable_safe,
+            "applied": args.apply_safe,
+        }, ensure_ascii=False, indent=2))
+    else:
+        print(f"Source Resolution Report: {date}")
+        print(f"  Checked: {report.total_checked}")
+        print(f"  Safe enable: {report.resolved_enable_safe}")
+        print(f"  Needs adapter: {report.candidate_found_needs_adapter}")
+        print(f"  Needs review: {report.candidate_found_needs_review}")
+        print(f"  No candidate: {report.no_candidate_found}")
+        print(f"  Invalid URL: {report.invalid_existing_url}")
+        print(f"  Ambiguous: {report.ambiguous_candidates}")
+        print(f"  Report: {report_path}")
+
+    return 0
+
+
+def _result_to_dict(r) -> dict:
+    return {
+        "source_id": r.source_id,
+        "status": r.status,
+        "old_url": r.old_url,
+        "candidate_urls": r.candidate_urls,
+        "selected_url": r.selected_url,
+        "url_validation_status": r.url_validation_status,
+        "http_status": r.http_status,
+        "detected_source_kind": r.detected_source_kind,
+        "recommended_enabled": r.recommended_enabled,
+        "recommended_parser_strategy": r.recommended_parser_strategy,
+        "required_adapter": r.required_adapter,
+        "confidence": r.confidence,
+        "risk_level": r.risk_level,
+        "reason": r.reason,
+        "notes": r.notes,
+    }
 
 
 def cmd_pricing_snapshot(args: argparse.Namespace) -> int:
