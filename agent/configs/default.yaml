@@ -125,8 +125,8 @@ content_types:
     source_weight: 1.0
     half_life_h: 120
   tech_media:
-    source_weight: 0.85
-    half_life_h: 36
+    source_weight: 1.00
+    half_life_h: 48
   cn_aggregator:
     source_weight: 0.65
     half_life_h: 36
