@@ -125,7 +125,7 @@ content_types:
     source_weight: 1.0
     half_life_h: 120
   tech_media:
-    source_weight: 1.00
+    source_weight: 1.0
     half_life_h: 48
   cn_aggregator:
     source_weight: 0.65
@@ -595,6 +595,20 @@ sources:
   evidence_type: official_release
   section_hint: Model Capability Frontier
   audience_hint: all
+- id: google_developers_blog
+  type: rss
+  url: https://developers.googleblog.com/feeds/posts/default
+  weight: 1.1
+  max_items: 10
+  content_type: official_release
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: developer,researcher
+  notes: 'Google Developer blog: API releases, model announcements, I/O developer
+    news'
 - id: meta_ai_blog
   type: rss
   url: https://ai.meta.com/blog/rss/
