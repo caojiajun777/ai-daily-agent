@@ -47,6 +47,8 @@ _OFFICIAL_DOCS_PATTERNS = {
     "01ai": ["https://platform.01.ai/docs"],
     "baichuan": ["https://platform.baichuan-ai.com/docs"],
     "siliconflow": ["https://docs.siliconflow.cn"],
+    "zhipu": ["https://open.bigmodel.cn/dev/api", "https://docs.bigmodel.cn"],
+    "bigmodel": ["https://open.bigmodel.cn/dev/api", "https://docs.bigmodel.cn"],
 }
 
 _OFFICIAL_PRICING_PATTERNS = {
@@ -265,6 +267,9 @@ def resolve_source(
         result.recommended_enabled = False
         result.risk_level = "high"
         result.confidence = "low"
+        if ct in _NEVER_AUTO_ENABLE_CTS:
+            result.recommended_parser_strategy = _parser_for_ct(ct)
+            result.required_adapter = _adapter_for_ct(ct)
         return result
 
     # Validate first candidate that works
@@ -300,23 +305,38 @@ def resolve_source(
         result.reason = "no reachable URL found"
         result.recommended_enabled = False
         result.risk_level = "high"
+        if ct in _NEVER_AUTO_ENABLE_CTS:
+            result.recommended_parser_strategy = _parser_for_ct(ct)
+            result.required_adapter = _adapter_for_ct(ct)
+            result.status = "candidate_found_needs_adapter"
+            result.risk_level = "medium"
+            result.reason = f"candidate URLs exist but unreachable; {ct} requires {result.required_adapter}"
         return result
 
     result.selected_url = valid_url
     result.url_validation_status = f"HTTP {valid_status}"
 
     # Decide resolution
+    # Always set adapter/parser for never-auto-enable types
     if ct in _NEVER_AUTO_ENABLE_CTS:
         parser = _parser_for_ct(ct)
         adapter = _adapter_for_ct(ct)
-        result.status = "candidate_found_needs_adapter"
-        result.recommended_enabled = False
-        result.recommended_parser_strategy = parser
-        result.required_adapter = adapter
-        result.confidence = "high" if valid_url else "low"
-        result.risk_level = "medium"
-        result.reason = f"{ct} requires {adapter}; URL validated but source must stay disabled"
+        if valid_url:
+            result.status = "candidate_found_needs_adapter"
+            result.recommended_parser_strategy = parser
+            result.required_adapter = adapter
+            result.confidence = "high"
+            result.risk_level = "medium"
+            result.reason = f"{ct} requires {adapter}; URL validated but source must stay disabled"
+        else:
+            result.status = "candidate_found_needs_adapter"
+            result.recommended_parser_strategy = parser
+            result.required_adapter = adapter
+            result.confidence = "medium"
+            result.risk_level = "medium"
+            result.reason = f"{ct} requires {adapter}; URL not yet validated"
         result.notes = f"parser_strategy={parser}, implement {adapter} before enabling"
+        result.recommended_enabled = False
         return result
 
     if ct in _AUTO_ENABLE_SAFE_CTS and result.detected_source_kind == "rss_or_atom_feed":
