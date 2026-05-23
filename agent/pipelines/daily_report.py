@@ -389,8 +389,8 @@ def _enrich_images_for_draft(draft, tracer, timeout: float = 4.0) -> int:
 def _enrich_vision_for_draft(draft, tracer, max_items: int = 6) -> int:
     """Post-image enrichment: describe images with Qwen VL for richer context.
 
-    Runs after image extraction. Adds a Chinese description of each image
-    to the item summary so the writer has visual context.
+    Runs after image extraction. Stores a Chinese image description as
+    structured metadata. It deliberately does not mutate public article text.
     """
     from agent.tools.vision_enricher import describe_image
 
@@ -409,8 +409,7 @@ def _enrich_vision_for_draft(draft, tracer, max_items: int = 6) -> int:
                     article_text=item.summary,
                 )
                 if desc:
-                    # Blend vision insight naturally into the summary.
-                    item.summary = f"{item.summary}（配图显示：{desc}）"
+                    item.image_caption = desc
                     count += 1
             except Exception:
                 pass
@@ -903,6 +902,18 @@ def run_pipeline(
                     update={"post_duplicate_count": len(post_sem.duplicates)}
                 )
                 sem_dup_report = post_sem
+                remaining_severe = [
+                    d for d in post_sem.duplicates
+                    if d.severity in ("high", "medium")
+                ]
+                if remaining_severe:
+                    state.stage("write").mark_needs_review(
+                        "semantic duplicates remain after repair"
+                    )
+                    tracer.log(
+                        "post_repair_semantic_dup_needs_review",
+                        duplicate_count=len(remaining_severe),
+                    )
         else:
             # Repair attempted but failed → needs_human_review.
             state.stage("write").mark_needs_review(

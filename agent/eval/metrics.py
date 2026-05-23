@@ -22,7 +22,7 @@ def deterministic_metrics(
     curated_records: Optional[List[CuratedItemRecord]] = None,
 ) -> Dict[str, Any]:
     forbid_phrases = list(forbid_phrases or [])
-    section_count = len(draft.sections)
+    section_count = sum(1 for section in draft.sections if section.items)
     items = [it for s in draft.sections for it in s.items]
     item_count = len(items)
     titles = [it.title.strip().lower() for it in items if it.title]

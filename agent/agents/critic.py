@@ -38,9 +38,10 @@ def deterministic_critique(
     forbid_phrases = list(forbid_phrases or [])
     allowed_urls = {c.url for c in curated}
 
-    if len(draft.sections) < min_section_count:
+    nonempty_section_count = sum(1 for section in draft.sections if section.items)
+    if nonempty_section_count < min_section_count:
         reasons.append(
-            f"sections fewer than {min_section_count} (got {len(draft.sections)})"
+            f"non-empty sections fewer than {min_section_count} (got {nonempty_section_count})"
         )
 
     total_items = sum(len(s.items) for s in draft.sections)

@@ -621,6 +621,8 @@ def _story_key(evt: Optional[EventCluster]) -> str:
     if evt is None:
         return ""
     text = f"{evt.canonical_title} {evt.summary}".lower()
+    if _is_google_io_story(text):
+        return "google_io_2026"
     patterns = [
         r"\bqwen\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
         r"\bgpt-\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
@@ -633,6 +635,16 @@ def _story_key(evt: Optional[EventCluster]) -> str:
         if m:
             return m.group(0).replace(" ", "")
     return ""
+
+
+def _is_google_io_story(text: str) -> bool:
+    return (
+        "google i/o 2026" in text
+        or "google io 2026" in text
+        or "i/o 2026" in text
+        or "io 2026" in text
+        or "antigravity" in text
+    )
 
 
 def _fallback_why_it_matters(evt: EventCluster) -> str:

@@ -55,6 +55,7 @@ class DraftItem(BaseModel):
     one_liner: str = ""                         # short callout shown under the title
     body_paragraphs: List[str] = []             # richer long-form detail
     images: List[str] = []                      # multiple evidence/product images
+    image_caption: str = ""                     # internal visual context; not rendered by default
     item_type: str = ""                         # release | model | tool | product | capital | rumor | paper
     rumor_level: str = ""                       # confirmed | reported | rumor
     evidence_note: str = ""

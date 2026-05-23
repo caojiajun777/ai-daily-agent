@@ -198,6 +198,8 @@ def write_draft(
             max_items=max_items,
             tracer=tracer,
         )
+    else:
+        draft = _prune_empty_sections(draft)
     return draft
 
 
@@ -231,10 +233,7 @@ def _fallback_draft_from_items(
         section = _section_for_curated(item)
         buckets[section].append(_draft_item_from_curated(item, seq=seq))
 
-    sections = [
-        DraftSection(heading=heading, items=buckets[heading])
-        for heading in _SECTION_ORDER
-    ]
+    sections = _renumber_sections(buckets)
     overview_groups = [
         OverviewGroup(
             heading=section.heading,
@@ -338,6 +337,7 @@ def _complete_draft_with_items(
     sections = _renumber_sections(buckets)
     overview_groups = _overview_groups_from_sections(sections)
     item_count = sum(len(s.items) for s in sections)
+    overview = _cautious_overview(draft.overview, sections)
     if added:
         tracer.log("writer_completed_from_curated", added=added, item_count=item_count)
 
@@ -345,6 +345,7 @@ def _complete_draft_with_items(
         "date": date,
         "sections": sections,
         "overview_groups": overview_groups,
+        "overview": overview,
     })
 
 
@@ -379,10 +380,24 @@ def _renumber_sections(buckets: Dict[str, List[DraftItem]]) -> List[DraftSection
         renumbered: List[DraftItem] = []
         for item in buckets.get(heading, []):
             title = _strip_item_number(item.title)
+            if _looks_english_title(title):
+                title = _localized_title_from_item(item, title)
             renumbered.append(item.model_copy(update={"title": f"#{seq} {title}"}))
             seq += 1
-        sections.append(DraftSection(heading=heading, items=renumbered))
+        if renumbered:
+            sections.append(DraftSection(heading=heading, items=renumbered))
     return sections
+
+
+def _prune_empty_sections(draft: Draft) -> Draft:
+    sections = [section for section in draft.sections if section.items]
+    overview_groups = _overview_groups_from_sections(sections)
+    overview = _cautious_overview(draft.overview, sections)
+    return draft.model_copy(update={
+        "sections": sections,
+        "overview_groups": overview_groups,
+        "overview": overview,
+    })
 
 
 def _overview_groups_from_sections(sections: List[DraftSection]) -> List[OverviewGroup]:
@@ -506,6 +521,8 @@ def _rumor_level_for_curated(item: CuratedItem) -> str:
         return "rumor" if item.confidence == "low" else "reported"
     if item.confidence == "high" or "tier_0" in item.source_tier:
         return "confirmed"
+    if _is_official_social_item(item):
+        return "reported"
     if "insider" in item.content_type or "report" in item.evidence_type:
         return "reported"
     if item.confidence == "low":
@@ -520,6 +537,10 @@ def _evidence_note_for_curated(item: CuratedItem) -> str:
         return "官方定价页或价格快照"
     if item.evidence_type in ("paper", "research_paper") or "arxiv.org" in item.url:
         return "论文或技术报告"
+    if _is_official_social_item(item):
+        return "官方社媒发布，待补充长文或文档"
+    if _is_social_url(item.url):
+        return "社媒来源，需保守解读"
     if item.confidence == "low" or _section_for_curated(item) == "前瞻与传闻":
         return "未完全确认，按传闻/测试线索处理"
     if "tier_1" in item.source_tier:
@@ -585,7 +606,7 @@ def render_markdown(draft: Draft) -> str:
             lines.append(f"## {title} {item_id}")
         lines.append("")
 
-        callout = item.one_liner or _first_sentence(item.summary)
+        callout = _clean_public_text(item.one_liner or _first_sentence(item.summary))
         if callout:
             lines.append(f"> {callout}")
             lines.append("")
@@ -596,7 +617,7 @@ def render_markdown(draft: Draft) -> str:
 
         paragraphs = item.body_paragraphs or _summary_to_paragraphs(item.summary)
         for paragraph in paragraphs:
-            paragraph = paragraph.strip()
+            paragraph = _clean_public_text(paragraph)
             if paragraph:
                 lines.append(paragraph)
                 lines.append("")
@@ -715,7 +736,7 @@ def _first_sentence(text: str) -> str:
 
 
 def _summary_to_paragraphs(summary: str) -> List[str]:
-    text = (summary or "").strip()
+    text = _clean_public_text(summary or "")
     if not text:
         return []
     paragraphs = [p.strip() for p in _re_mod.split(r"\n{2,}", text) if p.strip()]
@@ -729,6 +750,105 @@ def _summary_to_paragraphs(summary: str) -> List[str]:
         " ".join(sentences[:mid]).strip(),
         " ".join(sentences[mid:]).strip(),
     ]
+
+
+def _clean_public_text(text: str) -> str:
+    """Remove internal visual-enrichment notes from reader-facing prose."""
+    if not text:
+        return ""
+    text = _re_mod.sub(r"[（(]\s*配图显示[:：][^）)]*[）)]", "", text)
+    text = _re_mod.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _looks_english_title(title: str) -> bool:
+    if _re_mod.search(r"[\u4e00-\u9fff]", title or ""):
+        return False
+    letters = len(_re_mod.findall(r"[A-Za-z]", title or ""))
+    return letters >= 12
+
+
+def _localized_title_from_item(item: DraftItem, fallback: str) -> str:
+    for candidate in (item.one_liner, item.summary):
+        text = _headline_candidate_from_text(candidate)
+        if not _re_mod.search(r"[\u4e00-\u9fff]", text):
+            continue
+        if 8 <= len(text) <= 44:
+            return text
+        if len(text) > 44:
+            return text[:44].rstrip("，,、；;：:")
+    return fallback
+
+
+def _headline_candidate_from_text(text: str) -> str:
+    text = _clean_public_text(text)
+    if not text:
+        return ""
+    text = _re_mod.sub(r"^(据报道|报道称|据称)[，,：: ]*", "", text).strip()
+    parts = _re_mod.split(r"[。！？；;]", text, maxsplit=1)
+    return parts[0].strip()
+
+
+def _cautious_overview(overview: str, sections: List[DraftSection]) -> str:
+    text = _clean_public_text(overview)
+    if not text:
+        return text
+    if any(k in text for k in ("据报道", "报道称", "据称", "尚未确认", "未确认")):
+        return text
+    weak_items = [
+        item for section in sections
+        if section.heading == "前瞻与传闻"
+        for item in section.items
+    ]
+    for item in weak_items:
+        title = _strip_item_number(item.title)
+        anchors = [
+            token for token in _re_mod.split(r"[\s，,。；;：:、]+", title)
+            if _is_distinct_weak_anchor(token)
+        ]
+        if any(anchor and anchor in text for anchor in anchors[:4]):
+            return f"据报道，{text}"
+    return text
+
+
+def _is_distinct_weak_anchor(token: str) -> bool:
+    token = (token or "").strip()
+    if len(token) < 3:
+        return False
+    common_entities = {
+        "openai", "google", "anthropic", "deepseek", "qwen",
+        "gemini", "claude", "gpt", "阿里", "英伟达", "黄仁勋",
+    }
+    if token.lower() in common_entities:
+        return False
+    return (
+        bool(_re_mod.search(r"\d", token))
+        or any(k in token for k in (
+            "融资", "估值", "传闻", "爆料", "未确认", "尚未",
+            "据称", "推进", "亿元", "BitCPM", "昇腾", "910B",
+        ))
+    )
+
+
+def _is_social_url(url: str) -> bool:
+    return bool(_re_mod.search(
+        r"^https?://(?:www\.)?(?:x|twitter)\.com/",
+        url or "",
+        _re_mod.I,
+    ))
+
+
+def _is_official_social_item(item: CuratedItem) -> bool:
+    if not _is_social_url(item.url):
+        return False
+    source = (item.source or "").lower()
+    official_sources = {
+        "x_openai", "openai", "x_anthropic", "x_anthropicai",
+        "x_googledeepmind", "x_gemini_app", "x_alibaba_qwen", "x_qwen",
+        "x_deepseek", "x_deepseek_ai", "x_tencent_hunyuan",
+        "x_zhipu", "x_moonshot", "x_minimax",
+    }
+    return source in official_sources or "tier_0" in (item.source_tier or "").lower()
 
 
 def _item_images(item: DraftItem) -> List[str]:

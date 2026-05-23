@@ -34,6 +34,9 @@ def guess_section(evt: EventCluster) -> str:
     if _is_model_release(text, title):
         return "模型发布"
 
+    if _is_product_application(text):
+        return "产品应用"
+
     if _has_any(text, _TECH_INSIGHT_TERMS):
         return "技术与洞察"
 
@@ -183,6 +186,17 @@ def _is_model_topic(text: str) -> bool:
     )
 
 
+def _is_product_application(text: str) -> bool:
+    """Detect shipped user-facing/productized AI experiences.
+
+    Some product stories contain words like "provider", "hardware partner", or
+    "stack" and would otherwise drift into industry/technical buckets. For a
+    daily reader, smart-home suites, plugins, mobile/desktop features, and
+    customer-facing integrations are product/application stories.
+    """
+    return _has_any(text, _PRODUCT_APPLICATION_TERMS)
+
+
 _CAPITAL_TERMS = (
     "融资", "funding", "ipo", "收购", "投资", "估值", "财报",
     "earnings", "revenue", "营收", "净利润", "季度", "quarterly",
@@ -232,6 +246,16 @@ _PRODUCT_TERMS = (
     "workflows",
     "healthcare", "therapy", "智能家居", "功能", "应用", "产品", "用户",
     "推出", "上线", "launch", "feature", "rollout", "更新",
+)
+
+_PRODUCT_APPLICATION_TERMS = (
+    "gemini for home", "smart home", "智能家居", "home ai",
+    "service provider", "service providers", "hardware partner",
+    "hardware partners", "reference design", "camera intelligence",
+    "activity summary", "natural language query", "turnkey",
+    "plugin", "powerpoint", "mobile app", "desktop app", "ios", "android",
+    "用户功能", "产品功能", "应用案例", "交钥匙", "参考设计",
+    "摄像头智能", "自然语言查询", "日常活动摘要",
 )
 
 _MODEL_FAMILY_TERMS = (

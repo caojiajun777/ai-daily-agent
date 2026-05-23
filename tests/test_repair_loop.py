@@ -583,7 +583,99 @@ def test_e2e_high_dup_repair_pipeline(
 
 
 # --------------------------------------------------------------------------- #
-# 10. max_tokens: sem dup critic respects configured value
+# 10. post-repair duplicate residue sets needs_human_review
+# --------------------------------------------------------------------------- #
+
+
+def test_post_repair_duplicate_residue_sets_needs_human_review(
+    tmp_path, monkeypatch, fake_raw_items
+):
+    monkeypatch.setattr(
+        "agent.pipelines.daily_report.collect", lambda specs, **k: fake_raw_items
+    )
+    url_a = fake_raw_items[0].url
+    url_b = fake_raw_items[1].url
+    url_c = fake_raw_items[2].url
+
+    def responder(messages):
+        system = messages[0].content if messages else ""
+        if "修复" in system:
+            return json.dumps({"actions": [{
+                "section": "研究",
+                "removed_title": "#2 B",
+                "removed_url": url_b,
+                "replacement_url": url_c,
+                "replacement_title": "#2 C",
+                "reason": "replace duplicate",
+            }]})
+        if "语义重复" in system:
+            return json.dumps({
+                "duplicates": [{
+                    "item_a_id": "#1",
+                    "item_b_id": "#2",
+                    "item_a_title": "#1 A",
+                    "item_b_title": "#2 C",
+                    "reason": "still overlaps",
+                    "severity": "medium",
+                }]
+            })
+        return json.dumps({
+            "date": DATE,
+            "title": f"AI 日报 {DATE}",
+            "sections": [
+                {"heading": "要闻", "items": [
+                    {"title": "#1 A", "summary": "s", "url": url_a, "source": "src"}
+                ]},
+                {"heading": "研究", "items": [
+                    {"title": "#2 B", "summary": "s", "url": url_b, "source": "src"}
+                ]},
+            ],
+        }, ensure_ascii=False)
+
+    from agent.llm.mock_provider import MockLLMProvider
+    from agent.pipelines.daily_report import run_pipeline
+
+    cfg = {
+        "run": {"timezone": "Asia/Shanghai", "max_items_curate": 5},
+        "llm": {
+            "temperature": 0.0,
+            "max_output_tokens": 1024,
+            "sem_dup_max_tokens": 512,
+            "repair_max_tokens": 512,
+        },
+        "budget": {
+            "max_total_input_tokens": 50_000,
+            "max_total_output_tokens": 10_000,
+            "max_total_calls": 20,
+            "hard_fail_on_exceed": True,
+        },
+        "context": {"max_messages_keep": 10, "per_message_max_chars": 4000},
+        "eval": {"min_section_count": 1, "min_unique_titles_ratio": 0.8, "forbid_phrases": []},
+        "sources": [],
+    }
+    prompts = {
+        "writer_system": "system",
+        "writer_user_template": "date={date} max={max_items} items={items_json}",
+        "critic_system": "critic",
+        "critic_user_template": "items={items_json} draft={draft_json}",
+    }
+
+    report = run_pipeline(
+        cfg=cfg,
+        prompts=prompts,
+        provider=MockLLMProvider(model="mock", responder=responder),
+        artifacts_root=str(tmp_path / "artifacts"),
+        date=DATE,
+    )
+
+    assert report["repair_attempted"] is True
+    assert report["repair_succeeded"] is True
+    assert report["post_repair_semantic_duplicate_count"] == 1
+    assert report["needs_human_review"] is True
+
+
+# --------------------------------------------------------------------------- #
+# 11. max_tokens: sem dup critic respects configured value
 # --------------------------------------------------------------------------- #
 
 

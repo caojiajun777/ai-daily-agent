@@ -10,6 +10,8 @@ from agent.agents.research_editor import (
     _parse_and_validate,
 )
 from agent.agents.final_selector import select_final_items
+from agent.agents.final_selector import _story_key
+from agent.agents.section_classifier import guess_section
 from agent.sources.base import RawItem
 
 
@@ -261,6 +263,49 @@ def test_section_validator_keeps_model_powered_agent_tool_out_of_model_frontier(
     }], "rejected": []}, ensure_ascii=False)
     output = _parse_and_validate(raw, [event])
     assert output.selected[0].section == "行业动态"
+
+
+def test_smart_home_ai_suite_is_product_application():
+    event = EventCluster(
+        event_id="evt_home",
+        canonical_title="Empowering Service Providers and Hardware Partners with Gemini for Home",
+        primary_url="https://developers.googleblog.com/gemini-for-home",
+        source_urls=["https://developers.googleblog.com/gemini-for-home"],
+        source_names=["google_developers_blog"],
+        source_types=["rss"],
+        source_count=1,
+        summary=(
+            "Google 推出 Gemini for Home 全栈 AI 方案，面向服务商和硬件伙伴，"
+            "提供摄像头智能、自然语言查询和交钥匙参考设计。"
+        ),
+    )
+
+    assert guess_section(event) == "产品应用"
+
+
+def test_google_io_rollup_and_antigravity_share_story_key():
+    rollup = EventCluster(
+        event_id="evt_io",
+        canonical_title="All the news from the Google I/O 2026 Developer keynote",
+        primary_url="https://developers.googleblog.com/io",
+        source_urls=["https://developers.googleblog.com/io"],
+        source_names=["google_developers_blog"],
+        source_types=["rss"],
+        source_count=1,
+        summary="Google I/O 2026 announced Gemini and Antigravity.",
+    )
+    antigravity = EventCluster(
+        event_id="evt_cli",
+        canonical_title="An important update: Transitioning Gemini CLI to Antigravity CLI",
+        primary_url="https://developers.googleblog.com/antigravity",
+        source_urls=["https://developers.googleblog.com/antigravity"],
+        source_names=["google_developers_blog"],
+        source_types=["rss"],
+        source_count=1,
+        summary="Gemini CLI is transitioning to Antigravity CLI.",
+    )
+
+    assert _story_key(rollup) == _story_key(antigravity) == "google_io_2026"
 
 
 def test_final_selector_normalizes_model_release_sections():
