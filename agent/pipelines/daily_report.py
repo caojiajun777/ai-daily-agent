@@ -18,7 +18,7 @@ import json
 import os
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from agent.agents.collector import collect
 from agent.agents.critic import deterministic_critique
@@ -26,7 +26,7 @@ from agent.agents.curator import curate_with_records, curate_with_llm
 from agent.agents.event_clusterer import cluster_items as cluster_events
 from agent.agents.event_scorer import score_events as score_events_rules
 from agent.agents.research_editor import run_research_editor
-from agent.agents.final_selector import select_final_items
+from agent.agents.final_selector import select_final_items, _guess_section, _story_key
 from agent.agents.history_checker import load_recent_titles
 from agent.agents.publisher import publish_local
 from agent.agents.repairer import repair_draft, RepairerFailed
@@ -63,6 +63,8 @@ def _run_research_editor_flow(
     history_days: int,
     enable_evidence: bool,
     evidence_timeout: float,
+    evidence_max_events: int,
+    evidence_urls_per_event: int,
     llm_timeout: int,
     artifacts_root: str,
 ):
@@ -97,15 +99,59 @@ def _run_research_editor_flow(
     events = score_events_rules(events, history_titles=history_titles,
                                 max_items=candidate_top_k)
     editorial_meta["candidate_top_k"] = len(events)
+    events = _balance_candidate_events(events, limit=min(max(candidate_top_k, 60), 80))
+    editorial_meta["balanced_candidate_count"] = len(events)
+
+    # 3b. LLM Re-rank — double-gate: ask LLM to rate real-world importance.
+    # Catches financial/earnings/product-launch news undervalued by rules.
+    try:
+        from agent.agents.llm_reranker import llm_rerank_events
+        # Use a non-reasoning model for structured scoring.
+        if provider.name == "deepseek":
+            from agent.llm.factory import build_provider
+            rerank_p = build_provider(
+                "deepseek", model="deepseek-chat",
+                skip_model_check=True,
+                request_timeout_s=llm_timeout,
+            )
+        else:
+            rerank_p = provider
+        events = llm_rerank_events(
+            events=events,
+            provider=rerank_p,
+            tracer=tracer,
+            budget=budget,
+            timeout_sec=llm_timeout,
+        )
+        tracer.log("llm_rerank_done", event_count=len(events),
+                    top_score=events[0].rule_score if events else 0)
+    except ImportError:
+        pass
+    except Exception as e:
+        tracer.log("llm_rerank_skip", error=str(e))
+
+    events = _balance_candidate_events(events, limit=min(max(candidate_top_k, 60), 80))
+    editorial_meta["post_rerank_balanced_candidate_count"] = len(events)
 
     # 4. Evidence fetch (optional).
     if enable_evidence:
         try:
             from agent.tools.evidence_fetcher import fetch_evidence_for_events
-            url_lists = [e.source_urls for e in events]
-            evidence_list = fetch_evidence_for_events(
+            top_events = events[:max(0, evidence_max_events)]
+            url_lists = [
+                e.source_urls[:max(1, evidence_urls_per_event)]
+                for e in top_events
+            ]
+            fetched_evidence = fetch_evidence_for_events(
                 url_lists, timeout=evidence_timeout,
             )
+            evidence_list = fetched_evidence + [
+                [] for _ in range(max(0, len(events) - len(fetched_evidence)))
+            ]
+            for evt, evlist in zip(events, evidence_list):
+                evt.evidence_snippets = [
+                    _format_evidence_snippet(e) for e in evlist[:3]
+                ]
             editorial_meta["evidence_fetch_success"] = sum(
                 1 for evlist in evidence_list for e in evlist if e.fetch_status == "ok"
             )
@@ -161,6 +207,104 @@ def _run_research_editor_flow(
     return curated, curated_records, editorial_meta
 
 
+def _balance_candidate_events(events: List[Any], *, limit: int = 70) -> List[Any]:
+    """Keep the editor candidate pool broad enough for a real daily.
+
+    Rule scores tend to over-rank arXiv because papers have excellent metadata
+    and fresh timestamps. A daily issue needs enough model/product/tool/market
+    candidates too, so we preserve top global items while capping any one
+    section before the LLM editor sees the list.
+    """
+    if len(events) <= limit:
+        return events
+
+    section_minimums = {
+        "模型前沿": 10,
+        "工具与开源": 8,
+        "产品落地": 8,
+        "资本动向": 5,
+        "产业风向": 6,
+        "论文精选": 14,
+    }
+    section_caps = {
+        "模型前沿": 14,
+        "工具与开源": 12,
+        "产品落地": 12,
+        "资本动向": 8,
+        "产业风向": 8,
+        "论文精选": 18,
+    }
+    buckets: Dict[str, List[Any]] = {}
+    for evt in events:
+        buckets.setdefault(_guess_section(evt), []).append(evt)
+
+    selected: List[Any] = []
+    seen_ids: set[str] = set()
+    section_counts: Dict[str, int] = {}
+    story_counts: Dict[str, int] = {}
+
+    def add(evt: Any, *, enforce_cap: bool = True, story_limit: int = 2) -> bool:
+        if len(selected) >= limit or evt.event_id in seen_ids:
+            return False
+        sec = _guess_section(evt)
+        cap = section_caps.get(sec, 10)
+        if enforce_cap and section_counts.get(sec, 0) >= cap:
+            return False
+        key = _story_key(evt)
+        if key and story_counts.get(key, 0) >= story_limit:
+            return False
+        selected.append(evt)
+        seen_ids.add(evt.event_id)
+        section_counts[sec] = section_counts.get(sec, 0) + 1
+        if key:
+            story_counts[key] = story_counts.get(key, 0) + 1
+        return True
+
+    # Preserve the strongest global candidates first.
+    for evt in events[:10]:
+        add(evt, enforce_cap=False, story_limit=3)
+
+    # Then force enough non-paper variety for the editor to choose from.
+    for sec, target in section_minimums.items():
+        for evt in buckets.get(sec, []):
+            if section_counts.get(sec, 0) >= target:
+                break
+            add(evt, enforce_cap=False)
+
+    # Fill the remaining space by score, with section caps.
+    for evt in events:
+        if len(selected) >= limit:
+            break
+        add(evt)
+
+    # If the source day is unusually concentrated, fill any leftover slots.
+    for evt in events:
+        if len(selected) >= limit:
+            break
+        add(evt, enforce_cap=False, story_limit=4)
+
+    return selected
+
+
+def _format_evidence_snippet(snippet: Any) -> str:
+    """Compact fetched evidence into prompt-safe text."""
+    status = getattr(snippet, "fetch_status", "")
+    etype = getattr(snippet, "evidence_type", "")
+    title = getattr(snippet, "title", "")
+    text = getattr(snippet, "text_snippet", "")
+    url = getattr(snippet, "url", "")
+    text = " ".join(str(text).split())[:450]
+    title = " ".join(str(title).split())[:160]
+    parts = [f"status={status}", f"type={etype}"]
+    if title:
+        parts.append(f"title={title}")
+    if text:
+        parts.append(f"text={text}")
+    if url:
+        parts.append(f"url={url}")
+    return " | ".join(parts)
+
+
 def _enrich_images_for_draft(draft, tracer, timeout: float = 4.0) -> int:
     """Post-writer enrichment: fetch og:image for article-page URLs only.
 
@@ -193,6 +337,8 @@ def _enrich_images_for_draft(draft, tracer, timeout: float = 4.0) -> int:
                 img = extract_image(url, timeout=timeout)
                 if img:
                     item.image_url = img
+                    if img not in item.images:
+                        item.images.append(img)
                     count += 1
             except Exception:
                 pass
@@ -212,7 +358,7 @@ def _enrich_vision_for_draft(draft, tracer, max_items: int = 6) -> int:
     count = 0
     for section in draft.sections:
         for item in section.items:
-            img_url = item.image_url
+            img_url = item.image_url or (item.images[0] if item.images else "")
             if not img_url:
                 continue
             if any(w in img_url.lower() for w in ("logo", "icon", "avatar", "t.png", "qrcode")):
@@ -338,6 +484,8 @@ def run_pipeline(
     fallback_enabled = bool(curation_cfg.get("fallback_to_rules", True))
     enable_evidence = bool(curation_cfg.get("enable_evidence_fetch", False))
     evidence_timeout = float(curation_cfg.get("evidence_fetch_timeout_sec", 8))
+    evidence_max_events = int(curation_cfg.get("evidence_max_events", 24))
+    evidence_urls_per_event = int(curation_cfg.get("evidence_urls_per_event", 3))
     llm_timeout = int(curation_cfg.get("llm_rerank_timeout_sec", 60))
 
     # Content-type-aware scoring config.
@@ -382,6 +530,8 @@ def run_pipeline(
                 history_days=history_days,
                 enable_evidence=enable_evidence,
                 evidence_timeout=evidence_timeout,
+                evidence_max_events=evidence_max_events,
+                evidence_urls_per_event=evidence_urls_per_event,
                 llm_timeout=llm_timeout,
                 artifacts_root=artifacts_root,
             )
@@ -459,6 +609,13 @@ def run_pipeline(
             budget=budget,
             temperature=float(llm_cfg.get("temperature", 0.3)),
             max_output_tokens=int(llm_cfg.get("max_output_tokens", 2048)),
+            allow_fallback=True,
+            complete_with_items=bool(
+                run_cfg.get(
+                    "complete_writer_with_curated",
+                    curation_cfg.get("mode") == "research_editor",
+                )
+            ),
         )
         s.mark_ok()
         tracer.log_stage("write", "ok")
@@ -473,7 +630,7 @@ def run_pipeline(
             for item in sec.items:
                 url_to_section[item.url] = sec.heading
         for rec in curated_records:
-            rec.section = url_to_section.get(rec.source_url)
+            rec.section = url_to_section.get(rec.source_url) or rec.section
 
         # Persist curated artifact.
         curated_output = CuratedOutput(

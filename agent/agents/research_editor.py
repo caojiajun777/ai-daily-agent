@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from agent.agents.event_clusterer import EventCluster
+from agent.agents.section_classifier import guess_section
 
 # ═══════════════════════════════════════════════════════════════════════
 # Pydantic schemas
@@ -58,20 +59,24 @@ _RESEARCH_EDITOR_PROMPT = """你是一个面向 AI 开发者、研究者和技�
 
 你的任务不是给新闻打 1-10 分或按热度排序。你的任务是基于候选事件、证据摘要和历史上下文，选择今天最值得读者看到的事件。
 
-## 日报 6 板块
+候选中的 evidence 字段来自对原始 URL 的抓取结果，是事实核验和细节提取的优先依据。若 evidence 与摘要不一致，以 evidence 为准；若 evidence 抓取失败或只有社交/媒体二手转述，应降低 confidence、使用 reported language，必要时标记 risk_level=high 或 reject。
+
+## 日报 7 板块
 1. 今日头条 — 当日最重要、最有影响力的 1-3 条
 2. 模型前沿 — 新模型发布、架构创新、训练技术、Benchmark
 3. 工具与开源 — SDK/API/框架/开源项目/定价变动
-4. 论文精选 — **硬约束：仅限 source_urls 含 arxiv.org 或 huggingface.co/papers 的学术论文**。产品发布、合作公告、企业新闻一律不放这里。
+4. 论文精选 — **硬约束：仅限 source_urls 含 arxiv.org 或 huggingface.co/papers 的学术论文**。软件 changelog、产品更新、技术博客、案例研究、合作伙伴宣传一律不放这里。
 5. 产品落地 — 产品发布、功能更新、真实应用案例
-6. 业界风向 — 融资/政策/并购/人事/行业趋势
+6. 资本动向 — 融资/财报/营收/IPO/估值/收购/投资
+7. 产业风向 — 政策/监管/并购/人事/合作伙伴/行业趋势
 
 ## 优先选择
 1. 官方发布、论文、代码、文档、API、价格、benchmark、一手证据充分的事件
-2. 对 AI 模型、开发工具链、产品生态、企业采用、政策环境、研究社区有实际影响的事件
-3. 相比历史日报有新增信息的事件
-4. 能改变读者判断或行动的事件
-5. 能补充日报 6 板块结构的事件
+2. 重要财报、融资、IPO、收购等资本事件（earnings/revenue/funding/IPO/acquisition）
+3. 对 AI 模型、开发工具链、产品生态、企业采用、政策环境、研究社区有实际影响的事件
+4. 相比历史日报有新增信息的事件
+5. 能改变读者判断或行动的事件
+6. 能补充日报 7 板块结构的事件
 
 ## 降低优先级
 1. 旧闻换标题
@@ -88,6 +93,7 @@ _RESEARCH_EDITOR_PROMPT = """你是一个面向 AI 开发者、研究者和技�
 4. 不允许编造事实
 5. 如果证据不足应标记 risk_level=high 或 reject
 6. 只输出 JSON，不要 markdown，不要解释
+7. rejected 数组最多 5 条；不要为了覆盖所有未选候选而输出长 rejected 列表
 
 ## 输出格式
 严格按照以下 JSON 结构输出：
@@ -97,7 +103,7 @@ _RESEARCH_EDITOR_PROMPT = """你是一个面向 AI 开发者、研究者和技�
       "event_id": "evt_xxx",
       "decision": "select",
       "priority": "must_include | high | medium | low",
-      "section": "今日头条 | 模型前沿 | 工具与开源 | 论文精选 | 产品落地 | 业界风向",
+       "section": "今日头条 | 模型前沿 | 工具与开源 | 论文精选 | 产品落地 | 资本动向 | 产业风向",
       "evidence_level": "official | primary | trusted_media | social | weak",
       "novelty": "new_event | meaningful_update | repeated_without_update | unclear",
       "reader_utility": "high | medium | low",
@@ -126,7 +132,7 @@ _RESEARCH_EDITOR_PROMPT = """你是一个面向 AI 开发者、研究者和技�
 - medium: 可用于补充板块
 - low: 仅候选不足时使用
 
-selected 数量控制在 16-24 条。不要重复。"""
+selected 数量控制在 16-25 条。不要重复。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -149,16 +155,28 @@ def run_research_editor(
     # Build the candidate listing for the LLM.
     candidate_lines: List[str] = []
     for i, evt in enumerate(events[:50]):
+        evlist = evidence[i] if evidence and i < len(evidence) else []
         candidate_lines.append(
             f"[{evt.event_id}] rule_score={evt.rule_score:.3f} "
             f"sources={evt.source_count} "
             f"title={evt.canonical_title[:120]}"
+        )
+        candidate_lines.append(
+            f"     source_meta: content_type={evt.primary_content_type}; "
+            f"tier={evt.primary_source_tier}; reliability={evt.primary_reliability}; "
+            f"evidence_type={evt.primary_evidence_type}; "
+            f"confidence={evt.primary_confidence}; "
+            f"section_hint={evt.primary_section_hint}"
         )
         if evt.summary:
             candidate_lines.append(f"     summary: {evt.summary[:200]}")
         candidate_lines.append(
             f"     source_urls: {', '.join(evt.source_urls[:4])}"
         )
+        evidence_lines = _candidate_evidence_lines(evt, evlist)
+        if evidence_lines:
+            candidate_lines.append("     evidence:")
+            candidate_lines.extend(f"       - {line}" for line in evidence_lines)
         candidate_lines.append("")
 
     # History context.
@@ -225,6 +243,28 @@ def run_research_editor(
     return output
 
 
+def _candidate_evidence_lines(evt: EventCluster, evlist: List[Any]) -> List[str]:
+    lines: List[str] = []
+    if evlist:
+        for snippet in evlist[:2]:
+            status = getattr(snippet, "fetch_status", "")
+            etype = getattr(snippet, "evidence_type", "")
+            title = " ".join(str(getattr(snippet, "title", "")).split())[:120]
+            text = " ".join(str(getattr(snippet, "text_snippet", "")).split())[:280]
+            url = getattr(snippet, "url", "")
+            parts = [f"status={status}", f"type={etype}"]
+            if title:
+                parts.append(f"title={title}")
+            if text:
+                parts.append(f"text={text}")
+            if url:
+                parts.append(f"url={url}")
+            lines.append(" | ".join(parts))
+    elif evt.evidence_snippets:
+        lines.extend(evt.evidence_snippets[:2])
+    return lines
+
+
 def _parse_and_validate(
     raw_text: str,
     events: List[EventCluster],
@@ -233,6 +273,7 @@ def _parse_and_validate(
 
     # Build lookup maps for validation.
     valid_event_ids = {e.event_id for e in events}
+    event_map = {e.event_id: e for e in events}
     event_urls = {e.event_id: set(e.source_urls) for e in events}
 
     # Strip think blocks / fences / conversational prefixes.
@@ -260,6 +301,10 @@ def _parse_and_validate(
                 parse_error += f" | bracket_parse_at_{e2.pos}: {raw[start:end+1][e2.pos-20:e2.pos+20] if e2.pos < len(raw[start:end+1]) else 'EOF'}"
                 offset = start + e2.pos
                 parse_error += f" | around_offset_{offset}: {raw[offset-30:offset+30]}"
+        if payload is None:
+            payload = _salvage_selected_payload(raw)
+            if payload is not None:
+                parse_error += " | salvaged_selected_only"
 
     if payload is None:
         return ResearchEditorOutput(notes=f"JSON parse failed: {parse_error}")
@@ -334,7 +379,7 @@ def _parse_and_validate(
     # Ensure selected have sections.
     for d in output.selected:
         if d.decision == "select" and not d.section:
-            d.section = "业界风向"  # default fallback
+            d.section = "产业风向"  # default fallback
 
     # Validate "论文精选" assignments: must have arxiv/HF source URLs.
     paper_sec_warnings: List[str] = []
@@ -345,12 +390,94 @@ def _parse_and_validate(
                 for s in d.sources_to_use
             )
             if not has_paper_url:
-                d.section = "业界风向"
+                d.section = "产业风向"
                 paper_sec_warnings.append(
                     f"moved_{d.event_id}_from_papers_to_industry: no arxiv/HF URL in sources"
                 )
+    # Reverse: arXiv/HF papers placed in non-paper sections should move to 论文精选.
+    # Exception: 今日头条 can keep arXiv papers if newsworthy enough.
+    for d in output.selected:
+        if d.decision != "select" or d.section == "论文精选":
+            continue
+        if d.section == "今日头条":
+            continue
+        has_paper_url = any(
+            "arxiv.org" in s.url or "huggingface.co/papers" in s.url
+            for s in d.sources_to_use
+        )
+        if has_paper_url:
+            old_section = d.section
+            d.section = "论文精选"
+            paper_sec_warnings.append(
+                f"moved_{d.event_id}_to_papers_from_{old_section}: has arxiv/HF source URL"
+            )
+    # Deterministic section sanity pass for obvious non-paper drift. Keep
+    # 今日头条 stable; it is an editorial priority bucket rather than a topic.
+    section_warnings: List[str] = []
+    for d in output.selected:
+        if d.decision != "select" or d.section in ("今日头条", "论文精选"):
+            continue
+        evt = event_map.get(d.event_id)
+        if evt is None:
+            continue
+        guessed = _guess_editor_section(evt)
+        if guessed and guessed != d.section:
+            old_section = d.section
+            d.section = guessed
+            section_warnings.append(
+                f"moved_{d.event_id}_from_{old_section}_to_{guessed}: deterministic_section_check"
+            )
     if paper_sec_warnings:
         existing = output.notes or ""
-        output.notes = (existing + " | paper_sec_fix: " + "; ".join(paper_sec_warnings[:3])).strip()
+        output.notes = (existing + " | paper_sec_fix: " + "; ".join(paper_sec_warnings[:5])).strip()
+    if section_warnings:
+        existing = output.notes or ""
+        output.notes = (existing + " | section_fix: " + "; ".join(section_warnings[:8])).strip()
 
     return output
+
+
+def _guess_editor_section(evt: EventCluster) -> str:
+    """Lightweight non-headline section validator for ResearchEditor output."""
+    return guess_section(evt)
+
+
+def _salvage_selected_payload(raw: str) -> Optional[Dict[str, Any]]:
+    """Recover a complete selected array when the rejected tail is truncated."""
+    key = '"selected"'
+    key_pos = raw.find(key)
+    if key_pos == -1:
+        return None
+    array_start = raw.find("[", key_pos)
+    if array_start == -1:
+        return None
+
+    depth = 0
+    in_string = False
+    escape = False
+    for idx in range(array_start, len(raw)):
+        ch = raw[idx]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "[":
+            depth += 1
+        elif ch == "]":
+            depth -= 1
+            if depth == 0:
+                selected_text = raw[array_start:idx + 1]
+                try:
+                    selected = _json.loads(selected_text)
+                except Exception:
+                    return None
+                if isinstance(selected, list):
+                    return {"selected": selected, "rejected": [], "notes": "salvaged selected; rejected omitted"}
+                return None
+    return None

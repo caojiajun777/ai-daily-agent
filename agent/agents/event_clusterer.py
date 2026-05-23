@@ -23,6 +23,8 @@ from urllib.parse import urlparse, parse_qs, urlunparse
 from agent.sources.base import RawItem
 
 _NORM_RE = re.compile(r"[^\w一-鿿]+", flags=re.UNICODE)
+_VERSION_DOT_RE = re.compile(r"(\d+)\.(\d+)")
+_VERSION_PATTERN = re.compile(r"(\d+\.\d+(?:\.\d+)?)")
 _TRACKING_PARAMS = {"utm_source", "utm_medium", "utm_campaign", "utm_term",
                      "utm_content", "ref", "spm", "from", "fbclid", "gclid",
                      "mc_cid", "mc_eid", "_ga", "utm_id"}
@@ -37,6 +39,14 @@ class EventCluster:
     event_id: str
     canonical_title: str
     primary_url: str
+    primary_source_name: str = ""
+    primary_source_type: str = ""
+    primary_content_type: str = "tech_media"
+    primary_source_tier: str = ""
+    primary_reliability: str = ""
+    primary_evidence_type: str = ""
+    primary_confidence: str = "medium"
+    primary_section_hint: str = ""
     source_urls: List[str] = field(default_factory=list)
     source_names: List[str] = field(default_factory=list)
     source_types: List[str] = field(default_factory=list)
@@ -50,6 +60,7 @@ class EventCluster:
     rule_score: float = 0.0
     already_reported: bool = False
     duplicate_candidates: List[str] = field(default_factory=list)
+    evidence_snippets: List[str] = field(default_factory=list)
 
 
 def cluster_items(items: List[RawItem]) -> List[EventCluster]:
@@ -77,11 +88,13 @@ def cluster_items(items: List[RawItem]) -> List[EventCluster]:
         if idx is None:
             # Check fuzzy title match against existing clusters.
             for i, cluster in enumerate(clusters):
-                sim = SequenceMatcher(None, norm_title,
-                                      _norm(cluster.canonical_title)).ratio()
+                cluster_norm = _norm(cluster.canonical_title)
+                sim = SequenceMatcher(None, norm_title, cluster_norm).ratio()
                 if sim >= _SIMILARITY_THRESHOLD:
-                    idx = i
-                    break
+                    # Prevent merging distinct product versions (e.g. Gemini 2.5 vs 3.5).
+                    if _same_product_version(norm_title, cluster_norm):
+                        idx = i
+                        break
 
         if idx is not None:
             # Merge into existing cluster.
@@ -102,6 +115,7 @@ def cluster_items(items: List[RawItem]) -> List[EventCluster]:
                 c.primary_url = it.url
                 c.canonical_title = it.title
                 c.summary = it.summary[:500]
+                _set_primary_source(c, it)
             if canon_url not in url_map:
                 url_map[canon_url] = idx
             if norm_title not in title_map:
@@ -112,6 +126,14 @@ def cluster_items(items: List[RawItem]) -> List[EventCluster]:
                 event_id=_gen_event_id(it.title, it.url),
                 canonical_title=it.title,
                 primary_url=it.url,
+                primary_source_name=it.source_id,
+                primary_source_type=it.source_type,
+                primary_content_type=getattr(it, "content_type", "tech_media"),
+                primary_source_tier=getattr(it, "source_tier", ""),
+                primary_reliability=getattr(it, "reliability", ""),
+                primary_evidence_type=getattr(it, "evidence_type", ""),
+                primary_confidence=getattr(it, "confidence", "medium"),
+                primary_section_hint=getattr(it, "section_hint", ""),
                 source_urls=[it.url],
                 source_names=[it.source_id],
                 source_types=[it.source_type],
@@ -131,19 +153,39 @@ def cluster_items(items: List[RawItem]) -> List[EventCluster]:
     return clusters
 
 
+def _set_primary_source(cluster: EventCluster, item: RawItem) -> None:
+    cluster.primary_source_name = item.source_id
+    cluster.primary_source_type = item.source_type
+    cluster.primary_content_type = getattr(item, "content_type", "tech_media")
+    cluster.primary_source_tier = getattr(item, "source_tier", "")
+    cluster.primary_reliability = getattr(item, "reliability", "")
+    cluster.primary_evidence_type = getattr(item, "evidence_type", "")
+    cluster.primary_confidence = getattr(item, "confidence", "medium")
+    cluster.primary_section_hint = getattr(item, "section_hint", "")
+
+
 def _norm(text: str) -> str:
-    """Aggressive normalization: lowercase, strip punctuation, marketing words, branding."""
     t = text.lower()
-    # Remove marketing words.
     for w in _MARKETING_WORDS:
         t = t.replace(w.lower(), "")
-    # Strip HTML entities.
     t = re.sub(r"&[a-z]+;", " ", t)
-    # Normalize Unicode and punctuation.
+    # Protect version number dots so "Gemini 2.5" and "Gemini 3.5" stay distinct
+    t = _VERSION_DOT_RE.sub(r"\1_VDOT_\2", t)
     t = _NORM_RE.sub(" ", t)
-    # Collapse whitespace.
+    t = t.replace("_VDOT_", ".")
     t = re.sub(r"\s+", " ", t).strip()
     return t
+
+
+def _same_product_version(norm_a: str, norm_b: str) -> bool:
+    """Returns True if both titles reference the same product version, or
+    if at least one has no version number (can't determine divergence).
+    Prevents merging 'Gemini 2.5 Flash' with 'Gemini 3.5 Flash'."""
+    versions_a = set(_VERSION_PATTERN.findall(norm_a))
+    versions_b = set(_VERSION_PATTERN.findall(norm_b))
+    if not versions_a or not versions_b:
+        return True
+    return versions_a == versions_b
 
 
 def _canonical_url(url: str) -> str:

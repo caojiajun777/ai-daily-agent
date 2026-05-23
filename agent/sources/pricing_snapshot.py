@@ -22,6 +22,56 @@ from agent.schemas import (
     PricingProviderSnapshot,
     PricingSnapshot,
 )
+from agent.sources.base import RawItem
+
+
+class PricingSnapshotAdapter:
+    """Collector adapter for pricing snapshot sources.
+
+    Static pricing configs are primarily used by the dedicated pricing diff
+    workflow. During normal collection we stay quiet unless a source explicitly
+    opts in with ``emit_static_candidates: true``; otherwise unchanged pricing
+    pages would create repetitive daily stories.
+    """
+
+    type_name = "pricing_snapshot"
+
+    def __init__(self, spec: Dict[str, Any]) -> None:
+        self.spec = spec
+        self.source_id = spec.get("id", "pricing_snapshot")
+
+    def fetch(self, *, max_items: int = 20) -> List[RawItem]:
+        if not self.spec.get("emit_static_candidates", False):
+            return []
+
+        now_ts = datetime.now(timezone.utc).isoformat()
+        source_url = self.spec.get("source_url") or self.spec.get("url", "")
+        provider = self.spec.get("provider", self.source_id)
+        items: List[RawItem] = []
+        for rec in (self.spec.get("pricing_records") or [])[:max_items]:
+            if not isinstance(rec, dict):
+                continue
+            model = str(rec.get("model", "")).strip()
+            if not model:
+                continue
+            price_bits = []
+            if rec.get("input_price_per_m") is not None:
+                price_bits.append(f"input {rec.get('input_price_per_m')}/{rec.get('currency', 'USD')} per 1M")
+            if rec.get("output_price_per_m") is not None:
+                price_bits.append(f"output {rec.get('output_price_per_m')}/{rec.get('currency', 'USD')} per 1M")
+            if rec.get("cache_hit_price_per_m") is not None:
+                price_bits.append(f"cache hit {rec.get('cache_hit_price_per_m')}/{rec.get('currency', 'USD')} per 1M")
+            summary = "; ".join(price_bits) or str(rec.get("notes", "pricing snapshot"))
+            items.append(RawItem(
+                source_id=self.source_id,
+                source_type=self.type_name,
+                title=f"{provider} {model} pricing snapshot",
+                url=source_url,
+                summary=summary,
+                published_at=now_ts,
+                content_type=self.spec.get("content_type", "pricing_page"),
+            ))
+        return items
 
 
 def _compute_content_hash(raw_text: str) -> str:

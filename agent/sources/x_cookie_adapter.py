@@ -41,7 +41,7 @@ def _get_page(proxy_url: str, user_agent: str):
         user_agent=user_agent,
         viewport={"width": 1280, "height": 900},
     )
-    return ctx.new_page()
+    return ctx, ctx.new_page()
 
 
 class XCookieAdapter:
@@ -72,13 +72,14 @@ class XCookieAdapter:
             "Chrome/131.0.0.0 Safari/537.36"
         )
 
-        # Try with proxy first (for GFW environments), fall back to direct.
-        for attempt, use_proxy in enumerate([proxy, None]):
-            if attempt > 0 and proxy is None:
-                break  # no proxy configured, only one attempt needed
+        # Try with proxy. If no proxy configured, try direct.
+        # Do NOT fallback to direct when proxy is set (x.com blocked in GFW envs).
+        attempts = [proxy] if proxy else [None]
+        for use_proxy in attempts:
             page = None
+            ctx = None
             try:
-                page = _get_page(use_proxy or "", ua)
+                ctx, page = _get_page(use_proxy or "", ua)
                 page.goto(
                     f"https://x.com/{self.username}",
                     wait_until="load",
@@ -99,6 +100,11 @@ class XCookieAdapter:
                 if page:
                     try:
                         page.close()
+                    except Exception:
+                        pass
+                if ctx:
+                    try:
+                        ctx.close()
                     except Exception:
                         pass
 

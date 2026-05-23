@@ -1,6 +1,9 @@
 name: Agent — Daily Run & Publish
 
-# Runs every day at 08:00 Beijing time (UTC 00:00).
+# Runs every day at 10:00 Beijing time (UTC 02:00), then waits until
+# 12:00 Beijing time before publishing. This gives the LLM pipeline time
+# to collect, curate, repair, and pass gates while keeping the public
+# issue/email release at noon.
 #
 # Token policy: PUBLISH_TOKEN must be the repo owner's PAT.
 # Issues created by github-actions[bot] lack proper authorship for audit
@@ -17,7 +20,7 @@ name: Agent — Daily Run & Publish
 
 on:
   schedule:
-    - cron: "0 4 * * *"   # 12:00 CST = 04:00 UTC
+    - cron: "0 2 * * *"   # 10:00 CST = 02:00 UTC; publish waits until 12:00 CST
   workflow_dispatch:
     inputs:
       date:
@@ -91,6 +94,20 @@ jobs:
           python -m agent.cli publish-issue \
             --run-id "${{ steps.date.outputs.date }}" \
             --dry-run
+
+      - name: Wait until noon Beijing time
+        if: ${{ inputs.dry_run != 'true' }}
+        shell: bash
+        run: |
+          TARGET_TS=$(TZ=Asia/Shanghai date -d "$(TZ=Asia/Shanghai date +%Y-%m-%d) 12:00:00" +%s)
+          NOW_TS=$(date +%s)
+          WAIT_SECONDS=$(( TARGET_TS - NOW_TS ))
+          if [ "$WAIT_SECONDS" -gt 0 ]; then
+            echo "Waiting ${WAIT_SECONDS}s so publish happens at 12:00 Asia/Shanghai."
+            sleep "$WAIT_SECONDS"
+          else
+            echo "No wait needed; target publish time has passed."
+          fi
 
       - name: Publish (confirmed)
         if: ${{ inputs.dry_run != 'true' }}

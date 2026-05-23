@@ -63,7 +63,9 @@ def deterministic_critique(
 
     # ── Tier-aware quality checks ──────────────────────────────────
     tier_pulse_sections = {"硅谷脉搏", "社区脉搏", "Silicon Valley / Community Pulse",
-                           "业界风向", "Industry Watch", "Industry Strategy & Company Moves"}
+                           "业界风向", "产业风向", "资本动向",
+                           "Industry Watch", "Capital Moves",
+                           "Industry Strategy & Company Moves"}
     investment_keywords = ["买入", "卖出", "必涨", "必跌", "稳赚", "抄底", "逃顶",
                            "买入推荐", "卖出推荐", "目标价", "评级上调", "评级下调",
                            "buy", "sell", "long", "short", "overweight", "underweight"]
@@ -78,7 +80,7 @@ def deterministic_critique(
 
             # Tier 3 items should not appear in non-Pulse sections (only if tier set).
             if tier and "tier_3" in tier and heading not in tier_pulse_sections:
-                if heading not in ("业界风向", "Industry Watch"):
+                if heading not in ("产业风向", "资本动向", "Industry Watch", "Capital Moves"):
                     reasons.append(
                         f"tier3_major_claim: {item.title[:60]} has tier={tier} "
                         f"but section={heading} is not a Pulse section"

@@ -7,7 +7,10 @@ Guarantees a minimum number of arxiv papers in the final selection.
 
 from __future__ import annotations
 
+import re
+import time
 from collections import Counter
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from agent.agents.event_clusterer import EventCluster
@@ -15,6 +18,7 @@ from agent.agents.research_editor import (
     EditorialDecision,
     ResearchEditorOutput,
 )
+from agent.agents.section_classifier import guess_section as _classify_section
 from agent.schemas import CuratedItem, CuratedItemRecord
 
 _MIN_PAPERS = 5
@@ -67,8 +71,8 @@ def select_final_items(
                 evidence_level="primary" if evt.source_count >= 2 else "social",
                 novelty="unclear",
                 reader_utility="medium",
-                why_it_matters="Fallback — rule score ranked.",
-                writing_angle=f"Based on {evt.source_count} source(s).",
+                why_it_matters=_fallback_why_it_matters(evt),
+                writing_angle=_fallback_writing_angle(evt, _guess_section(evt)),
                 risk_level="low",
                 sources_to_use=[],
             )
@@ -77,6 +81,10 @@ def select_final_items(
                 all_decisions[evt.event_id].sources_to_use = [
                     SourceUse(url=evt.source_urls[0], role="primary"),
                 ]
+
+    normalized_sections = _normalize_decision_sections(all_decisions, event_map)
+    if normalized_sections:
+        meta["section_normalized_count"] = normalized_sections
 
     # ── Priority ordering ────────────────────────────────────────────
     priority_order = {"must_include": 0, "high": 1, "medium": 2, "low": 3}
@@ -92,18 +100,95 @@ def select_final_items(
     final_ids: List[str] = []
     section_counts: Counter = Counter()
     source_counts: Counter = Counter()
+    story_counts: Counter = Counter()
     section_caps: Dict[str, int] = {
         "今日头条": 3, "模型前沿": 4, "工具与开源": 3,
-        "论文精选": 5, "产品落地": 3, "业界风向": 4,
+        "论文精选": 5, "产品落地": 3,
+        "资本动向": 3, "产业风向": 4,
     }
-    section_order = ["今日头条", "模型前沿", "工具与开源", "论文精选", "产品落地", "业界风向"]
+    section_order = ["今日头条", "模型前沿", "工具与开源", "论文精选", "产品落地", "资本动向", "产业风向"]
+    ranked_events = sorted(events, key=lambda e: e.rule_score, reverse=True)
+
+    def ensure_decision(
+        evt: EventCluster,
+        section: str,
+        *,
+        priority: str = "low",
+    ) -> Tuple[EditorialDecision, bool]:
+        dec = all_decisions.get(evt.event_id)
+        if dec is not None:
+            return dec, False
+        dec = EditorialDecision(
+            event_id=evt.event_id,
+            decision="select",
+            priority=priority,
+            section=section,
+            evidence_level="primary" if evt.source_count >= 2 else "weak",
+            novelty="unclear",
+            reader_utility="medium",
+            why_it_matters=_fallback_why_it_matters(evt),
+            writing_angle=_fallback_writing_angle(evt, section),
+            risk_level="medium",
+            sources_to_use=[],
+        )
+        if evt.source_urls:
+            from agent.agents.research_editor import SourceUse
+            dec.sources_to_use = [SourceUse(url=evt.source_urls[0], role="primary")]
+        all_decisions[evt.event_id] = dec
+        sorted_ids.append(evt.event_id)
+        return dec, True
+
+    def try_add_event(
+        evt: EventCluster,
+        *,
+        section: Optional[str] = None,
+        respect_caps: bool = True,
+        respect_story: bool = True,
+        priority: str = "low",
+    ) -> bool:
+        if len(final_ids) >= max_items or evt.event_id in final_ids:
+            return False
+        if _is_stale_background_event(evt):
+            return False
+        sec = section or (all_decisions.get(evt.event_id).section if all_decisions.get(evt.event_id) else "")
+        sec = sec or _guess_section(evt)
+        cap = section_caps.get(sec, 4)
+        if sec == "论文精选" and section_counts.get(sec, 0) >= cap:
+            return False
+        if respect_caps and section_counts.get(sec, 0) >= cap:
+            return False
+        key = _story_key(evt)
+        if respect_story and key and story_counts.get(key, 0) >= 1:
+            return False
+
+        dec, created = ensure_decision(evt, sec, priority=priority)
+        if created or dec.section not in section_order:
+            dec.section = sec
+        final_ids.append(evt.event_id)
+        section_counts[sec] += 1
+        if key:
+            story_counts[key] += 1
+        for s in evt.source_names:
+            source_counts[s] += 1
+        return True
 
     # First pass: must_include always in.
     for eid in sorted_ids:
         d = all_decisions[eid]
         if d.priority == "must_include":
+            evt = event_map.get(eid)
+            if evt and _is_stale_background_event(evt):
+                continue
+            sec = d.section or "产业风向"
+            key = _story_key(evt)
+            if section_counts.get(sec, 0) >= section_caps.get(sec, 4):
+                continue
+            if key and story_counts.get(key, 0) >= 1:
+                continue
             final_ids.append(eid)
-            section_counts[d.section or "业界风向"] += 1
+            section_counts[sec] += 1
+            if key:
+                story_counts[key] += 1
 
     # Second pass: fill by priority, respecting caps.
     for eid in sorted_ids:
@@ -113,7 +198,7 @@ def select_final_items(
         if d.priority == "must_include":
             continue
 
-        sec = d.section or "业界风向"
+        sec = d.section or "产业风向"
 
         # Section cap check.
         cap = section_caps.get(sec, 4)
@@ -122,6 +207,11 @@ def select_final_items(
 
         # Source diversity: max 3 from same source (for the whole draft).
         evt = event_map.get(eid)
+        if evt and _is_stale_background_event(evt):
+            continue
+        key = _story_key(evt)
+        if key and story_counts.get(key, 0) >= 1:
+            continue
         if evt and source_diversity:
             max_src = max(
                 (source_counts.get(s, 0) for s in evt.source_names),
@@ -132,10 +222,12 @@ def select_final_items(
 
         final_ids.append(eid)
         section_counts[sec] += 1
+        if key:
+            story_counts[key] += 1
         for s in (evt.source_names if evt else []):
             source_counts[s] += 1
 
-    # Ensure all 6 sections have at least 1 item.
+    # Ensure all 7 sections have at least 1 item.
     covered = set(section_counts.keys())
     missing = [s for s in section_order if s not in covered]
     for eid in sorted_ids:
@@ -145,16 +237,133 @@ def select_final_items(
             continue
         d = all_decisions[eid]
         if d.section in missing:
+            evt = event_map.get(eid)
+            if evt and _is_stale_background_event(evt):
+                continue
+            key = _story_key(evt)
+            if key and story_counts.get(key, 0) >= 1:
+                continue
             final_ids.append(eid)
+            section_counts[d.section] += 1
+            if key:
+                story_counts[key] += 1
             missing.remove(d.section)
+
+    # The editor may omit an entire section even when the collector found good
+    # candidates. Pull section fillers from the full event pool before giving up.
+    if missing and len(final_ids) < max_items:
+        for sec in list(missing):
+            for evt in ranked_events:
+                if _guess_section(evt) != sec:
+                    continue
+                if try_add_event(evt, section=sec, respect_caps=False, respect_story=True):
+                    missing.remove(sec)
+                    break
+
+    # Ensure 资本动向 has at least 2 items (financial news quota).
+    if section_counts.get("资本动向", 0) < 2 and len(final_ids) < max_items:
+        for eid in sorted_ids:
+            if len(final_ids) >= max_items or section_counts.get("资本动向", 0) >= 2:
+                break
+            if eid in final_ids:
+                continue
+            d = all_decisions[eid]
+            if d.section == "资本动向":
+                evt = event_map.get(eid)
+                if evt and _is_stale_background_event(evt):
+                    continue
+                key = _story_key(evt)
+                if key and story_counts.get(key, 0) >= 1:
+                    continue
+                final_ids.append(eid)
+                section_counts["资本动向"] += 1
+                if key:
+                    story_counts[key] += 1
+
+    if section_counts.get("资本动向", 0) < 2 and len(final_ids) < max_items:
+        for evt in ranked_events:
+            if section_counts.get("资本动向", 0) >= 2:
+                break
+            if _guess_section(evt) != "资本动向":
+                continue
+            try_add_event(evt, section="资本动向", respect_caps=False, respect_story=True)
+
+    # If diversity caps leave us short, backfill with high-scoring non-paper
+    # events that the editor did not explicitly select. This keeps the daily
+    # broad without letting arXiv papers flood the issue.
+    if len(final_ids) < min_items:
+        known_ids = set(sorted_ids)
+        added_backfill = 0
+        for evt in events:
+            if added_backfill >= max_items:
+                break
+            if evt.event_id in known_ids:
+                continue
+            sec = _guess_section(evt)
+            if sec == "论文精选":
+                continue
+            if _is_stale_background_event(evt):
+                continue
+            all_decisions[evt.event_id] = EditorialDecision(
+                event_id=evt.event_id,
+                decision="select",
+                priority="low",
+                section=sec,
+                evidence_level="primary" if evt.source_count >= 2 else "weak",
+                novelty="unclear",
+                reader_utility="medium",
+                why_it_matters=_fallback_why_it_matters(evt),
+                writing_angle=_fallback_writing_angle(evt, sec),
+                risk_level="medium",
+                sources_to_use=[],
+            )
+            if evt.source_urls:
+                from agent.agents.research_editor import SourceUse
+                all_decisions[evt.event_id].sources_to_use = [
+                    SourceUse(url=evt.source_urls[0], role="primary"),
+                ]
+            sorted_ids.append(evt.event_id)
+            known_ids.add(evt.event_id)
+            added_backfill += 1
 
     # Ensure min_items.
     if len(final_ids) < min_items:
-        for eid in sorted_ids:
+        for respect_caps, respect_story in ((True, True), (False, True)):
+            for eid in sorted_ids:
+                if len(final_ids) >= min_items:
+                    break
+                if eid in final_ids:
+                    continue
+                d = all_decisions[eid]
+                sec = d.section or "产业风向"
+                cap = section_caps.get(sec, 4)
+                if sec == "论文精选" and section_counts.get(sec, 0) >= cap:
+                    continue
+                if respect_caps and section_counts.get(sec, 0) >= cap:
+                    continue
+                evt = event_map.get(eid)
+                if evt and _is_stale_background_event(evt):
+                    continue
+                key = _story_key(evt)
+                if respect_story and key and story_counts.get(key, 0) >= 1:
+                    continue
+                final_ids.append(eid)
+                section_counts[sec] += 1
+                if key:
+                    story_counts[key] += 1
             if len(final_ids) >= min_items:
                 break
-            if eid not in final_ids:
-                final_ids.append(eid)
+
+    if len(final_ids) < min_items:
+        for evt in ranked_events:
+            if len(final_ids) >= min_items:
+                break
+            sec = _guess_section(evt)
+            if sec == "论文精选" and section_counts.get(sec, 0) >= section_caps["论文精选"]:
+                continue
+            if _is_stale_background_event(evt):
+                continue
+            try_add_event(evt, section=sec, respect_caps=False, respect_story=True)
 
     meta["final_selected_count"] = len(final_ids)
 
@@ -202,6 +411,13 @@ def select_final_items(
     # ── Convert to CuratedItems ──────────────────────────────────────
     writer_items: List[CuratedItem] = []
     records: List[CuratedItemRecord] = []
+    story_url_map: Dict[str, List[str]] = {}
+    for evt in events:
+        key = _story_key(evt)
+        if not key:
+            continue
+        story_url_map.setdefault(key, [])
+        story_url_map[key].extend(evt.source_urls)
 
     for eid in final_ids:
         evt = event_map.get(eid)
@@ -217,54 +433,257 @@ def select_final_items(
                     primary_url = s.url
                     break
 
+        section = dec.section if dec and dec.section else _guess_section(evt)
+        primary_source_name = evt.primary_source_name or (
+            evt.source_names[0] if evt.source_names else "unknown"
+        )
+        primary_source_type = evt.primary_source_type or (
+            evt.source_types[0] if evt.source_types else "rss"
+        )
+        source_tier, reliability, evidence_type, confidence = _normalized_source_meta(
+            evt=evt,
+            primary_source_name=primary_source_name,
+            primary_url=primary_url,
+        )
+        supporting_urls = _supporting_urls(evt, dec, primary_url)
+        story_key = _story_key(evt)
+        if story_key:
+            supporting_urls = _merge_urls(
+                supporting_urls,
+                story_url_map.get(story_key, []),
+                primary_url,
+            )
+        why_it_matters = dec.why_it_matters if dec else ""
+        writing_angle = dec.writing_angle if dec else ""
+
         writer_items.append(CuratedItem(
             title=evt.canonical_title,
             url=primary_url,
             summary=evt.summary[:500],
-            source=evt.source_names[0] if evt.source_names else "unknown",
-            source_type=evt.source_types[0] if evt.source_types else "rss",
+            source=primary_source_name,
+            source_type=primary_source_type,
             published_at=evt.latest_seen_at,
             score=evt.rule_score,
+            content_type=evt.primary_content_type or "tech_media",
+            source_tier=source_tier,
+            reliability=reliability,
+            evidence_type=evidence_type,
+            confidence=confidence,
+            section=section,
+            section_hint=evt.primary_section_hint,
+            why_it_matters=why_it_matters,
+            writing_angle=writing_angle,
+            supporting_urls=supporting_urls,
+            evidence_snippets=evt.evidence_snippets[:3],
         ))
 
         records.append(CuratedItemRecord(
             raw_item_id=evt.event_id,
             title=evt.canonical_title,
             source_url=primary_url,
-            source_name=evt.source_names[0] if evt.source_names else "unknown",
+            source_name=primary_source_name,
             published_at=evt.latest_seen_at or None,
             score=evt.rule_score,
-            section=dec.section if dec else None,
+            section=section,
             selected_reason=f"priority={dec.priority}" if dec else "rule",
             duplicate_group_id=None,
             used_in_draft=True,
+            content_type=evt.primary_content_type or "tech_media",
+            source_tier=source_tier,
+            reliability=reliability,
+            confidence=confidence,
+            evidence_type=evidence_type,
+            section_hint=evt.primary_section_hint,
         ))
 
     return writer_items, records, meta
 
 
+def _supporting_urls(
+    evt: EventCluster,
+    dec: Optional[EditorialDecision],
+    primary_url: str,
+    limit: int = 4,
+) -> List[str]:
+    urls: List[str] = []
+    if dec:
+        for src in dec.sources_to_use:
+            if src.url != primary_url:
+                urls.append(src.url)
+    for url in evt.source_urls:
+        if url != primary_url:
+            urls.append(url)
+
+    seen = set()
+    out: List[str] = []
+    for url in urls:
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        out.append(url)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _merge_urls(base: List[str], extra: List[str], primary_url: str, limit: int = 4) -> List[str]:
+    merged = []
+    seen = {primary_url}
+    for url in [*base, *extra]:
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        merged.append(url)
+        if len(merged) >= limit:
+            break
+    return merged
+
+
+def _normalize_decision_sections(
+    decisions: Dict[str, EditorialDecision],
+    event_map: Dict[str, EventCluster],
+) -> int:
+    changed = 0
+    for event_id, dec in decisions.items():
+        if dec.decision != "select" or dec.section == "今日头条":
+            continue
+        evt = event_map.get(event_id)
+        if evt is None:
+            continue
+        guessed = _guess_section(evt)
+        if guessed and guessed != dec.section:
+            dec.section = guessed
+            changed += 1
+    return changed
+
+
+def _story_key(evt: Optional[EventCluster]) -> str:
+    """Coarse duplicate key for same product/event split across posts."""
+    if evt is None:
+        return ""
+    text = f"{evt.canonical_title} {evt.summary}".lower()
+    patterns = [
+        r"\bqwen\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
+        r"\bgpt-\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
+        r"\bclaude\s*\d+(?:\.\d+)*(?:\s*[a-z]+)?\b",
+        r"\bgemini\s*\d+(?:\.\d+)*(?:\s*[a-z]+)?\b",
+        r"\bcodex\b",
+        r"\bcopilot\s+for\s+eclipse\b",
+    ]
+    for pattern in patterns:
+        m = re.search(pattern, text)
+        if m:
+            return m.group(0).replace(" ", "")
+    return ""
+
+
+def _fallback_why_it_matters(evt: EventCluster) -> str:
+    text = " ".join((evt.summary or evt.canonical_title or "").split())
+    if not text:
+        return "该动态补充了今日 AI 行业的重要背景。"
+    sentence = re.split(r"(?<=[。！？.!?])\s+", text)[0]
+    return sentence[:90].rstrip("，,；; ") or evt.canonical_title[:90]
+
+
+def _fallback_writing_angle(evt: EventCluster, section: str) -> str:
+    angle_by_section = {
+        "模型前沿": "关注模型能力、可用性和开发者接入价值。",
+        "工具与开源": "关注它对开发流程、开源生态或本地部署的影响。",
+        "产品落地": "关注真实用户场景和产品化路径。",
+        "资本动向": "关注资金、估值和产业资源流向，不写投资建议。",
+        "产业风向": "关注政策、公司战略和行业格局信号。",
+        "论文精选": "关注方法亮点、适用场景和工程启发。",
+    }
+    return angle_by_section.get(section, f"基于 {evt.source_count} 个来源提炼关键信息。")
+
+
+def _normalized_source_meta(
+    *,
+    evt: EventCluster,
+    primary_source_name: str,
+    primary_url: str,
+) -> Tuple[str, str, str, str]:
+    tier = evt.primary_source_tier or ""
+    reliability = evt.primary_reliability or ""
+    evidence_type = evt.primary_evidence_type or ""
+    confidence = evt.primary_confidence or "medium"
+
+    if _is_official_primary(primary_source_name, primary_url):
+        tier = "tier_0_core_evidence"
+        reliability = "high"
+        evidence_type = "official_release"
+        confidence = "high"
+    return tier, reliability, evidence_type, confidence
+
+
+def _is_official_primary(source_name: str, url: str) -> bool:
+    s = (source_name or "").lower()
+    u = (url or "").lower()
+    official_source_ids = {
+        "openai_news", "anthropic_news", "google_ai_blog",
+        "google_developers_blog", "google_deepmind_blog", "meta_ai_blog",
+        "microsoft_ai_blog", "huggingface_blog", "ollama_releases",
+        "x_openai", "x_anthropicai", "x_alibaba_qwen", "x_qwen",
+        "x_tencent_hunyuan", "x_deepseek_ai", "x_googledeepmind",
+    }
+    official_url_markers = (
+        "openai.com/index/",
+        "anthropic.com/news/",
+        "developers.googleblog.com/",
+        "blog.google/technology/ai/",
+        "deepmind.google/",
+        "ai.meta.com/blog/",
+        "github.com/ollama/ollama/releases/",
+        "github.blog/changelog/",
+        "x.com/openai/",
+        "x.com/alibaba_qwen/",
+        "x.com/tencenthunyuan/",
+    )
+    return s in official_source_ids or any(marker in u for marker in official_url_markers)
+
+
+def _is_stale_background_event(evt: Optional[EventCluster]) -> bool:
+    if evt is None or _staleness_exempt(evt):
+        return False
+    age_h = _event_age_hours(evt)
+    if age_h is None or age_h < 168:
+        return False
+    if age_h >= 720:
+        return True
+    text = f"{evt.canonical_title} {evt.summary}".lower()
+    has_update = any(k in text for k in [
+        "today", "now", "new", "launch", "release", "update", "announce",
+        "发布", "推出", "上线", "更新", "宣布", "开源", "融资", "财报",
+    ])
+    return not has_update
+
+
+def _event_age_hours(evt: EventCluster) -> Optional[float]:
+    newest = evt.latest_seen_at or evt.published_at
+    if not newest:
+        return None
+    try:
+        dt = datetime.fromisoformat(newest.replace("Z", "+00:00"))
+        return max(0.0, (time.time() - dt.timestamp()) / 3600.0)
+    except Exception:
+        return None
+
+
+def _staleness_exempt(evt: EventCluster) -> bool:
+    text = (
+        f"{evt.primary_content_type} {evt.primary_evidence_type} "
+        f"{' '.join(evt.source_types)} {' '.join(evt.source_names)} "
+        f"{' '.join(evt.source_urls)}"
+    ).lower()
+    return (
+        "arxiv" in text
+        or "huggingface.co/papers" in text
+        or "research_paper" in text
+        or "pricing" in text
+        or "official_docs" in text
+    )
+
+
 def _guess_section(evt: EventCluster) -> str:
-    """Guess section from event content — v2.2 six-section layout."""
-    text = (evt.canonical_title + " " + evt.summary).lower()
-    # Paper detection: arxiv source or paper keywords — always papers
-    if any(t == "arxiv" for t in evt.source_types) or any(
-        k in text for k in ["论文", "arxiv", "paper", "researchers", "研究团队",
-                            "neurlps", "icml", "iclr", "cvpr", "emnlp", "aaai"]):
-        return "论文精选"
-    if any(k in text for k in ["融资", "funding", "ipo", "收购", "裁员", "政策", "监管",
-                                 "regulation", "law", "ban", "hire", "ceo", "executive",
-                                 "partnership", "合作", "投资", "估值"]):
-        return "业界风向"
-    if any(k in text for k in ["framework", "sdk", "tool", "library", "github", "开源",
-                                 "api", "cli", "plugin", "extension", "vscode", "copilot",
-                                 "降价", "定价", "免费", "open source"]):
-        return "工具与开源"
-    # Model before product — model keywords are more specific
-    if any(k in text for k in ["model", "模型", "gpt", "claude", "gemini", "parameters",
-                                 "benchmark", "eval", "llm", "diffusion", "语音",
-                                 "开源模型", "architecture", "training", "推理"]):
-        return "模型前沿"
-    if any(k in text for k in ["app", "product", "chatbot", "assistant", "功能", "应用",
-                                 "产品", "用户", "推出", "上线", "launch", "feature", "更新"]):
-        return "产品落地"
-    return "业界风向"
+    """Guess section from event content — v2.3 seven-section layout."""
+    return _classify_section(evt)

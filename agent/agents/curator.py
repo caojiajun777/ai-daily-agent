@@ -66,7 +66,8 @@ _AI_KEYWORDS_CN = [
     # Research & benchmarks
     "基准测试", "benchmark", "论文", "NeurIPS", "ICML", "ICLR", "CVPR",
     # Industry
-    "融资", "估值", "IPO", "裁员",
+    "融资", "估值", "IPO", "裁员", "财报", "营收", "净利润", "毛利率",
+    "earnings", "revenue", "季度", "Q1", "Q2", "Q3", "Q4",
 ]
 
 _AI_KEYWORDS_EN = [
@@ -80,6 +81,7 @@ _AI_KEYWORDS_EN = [
     "copilot", "codex", "chatbot", "inference",
     "autonomous", "robotics", "alignment", "safety",
     "quantization", "lora", "qlora", "distillation",
+    "earnings", "revenue", "quarterly", "acquisition", "funding round",
 ]
 
 _CN_GENERAL_SOURCES = {"ithome"}
@@ -140,7 +142,21 @@ def _relevance_boost(title: str, summary: str = "", source_id: str = "") -> floa
     # Zero keyword hits.
     if is_general:
         return 0.0   # general source + no AI keywords = hard drop
-    return 0.6       # AI source with no keywords: pass at reduced score
+    # Non-guaranteed, non-general source with zero AI keywords:
+    # Financial/broad-audience sources get strict filtering (they carry
+    # general news that may have no AI signal). AI-focused sources
+    # (newsletters, tools, changelogs) pass at reduced score.
+    _STRICT_SOURCES = {"cnbc_ai", "reuters_ai", "bloomberg_ai", "wsj_ai", "ft_ai",
+                       "axios_ai", "the_information_ai", "theinformation_ai"}
+    if source_id in _STRICT_SOURCES:
+        fin_signals = ["data center", "gpu", "chip", "cloud", "capex",
+                        "blackwell", "hopper", "h100", "b200", "inference",
+                        "training cluster", "supercomputer", "semiconductor",
+                        "ai model", "language model", "machine learning"]
+        if any(k in text for k in fin_signals):
+            return 0.65  # financial/general item with AI infra signal
+        return 0.0  # pure non-AI news
+    return 0.6  # AI-focused source: pass at reduced score (by definition AI-relevant)
 
 
 def _norm_title(title: str) -> str:

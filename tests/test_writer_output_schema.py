@@ -7,7 +7,7 @@ from agent.harness.budget import BudgetTracker
 from agent.harness.trace import Tracer
 from agent.llm import LLMMessage
 from agent.llm.mock_provider import MockLLMProvider
-from agent.schemas import CuratedItem
+from agent.schemas import CuratedItem, Draft, DraftItem, DraftSection, OverviewEntry, OverviewGroup
 
 
 def _make_curated():
@@ -61,9 +61,114 @@ def test_writer_accepts_valid_json(tmp_path):
     assert draft.title == "T"
     assert draft.sections[0].items[0].url == "u1"
     md = render_markdown(draft)
-    assert "## h" in md
+    assert "## 概览" in md       # juya-style overview index
+    assert "#1" in md            # item number in overview
     assert "https://x.com" not in md  # we only used u1 in the draft
     assert "u1" in md
+
+
+def test_writer_can_complete_omitted_curated_items(tmp_path):
+    items = [
+        CuratedItem(
+            title="模型更新",
+            url="https://example.com/model",
+            summary="模型更新摘要。",
+            source="official",
+            source_type="rss",
+            section="模型前沿",
+        ),
+        CuratedItem(
+            title="开源工具",
+            url="https://example.com/tool",
+            summary="开源工具摘要。",
+            source="github",
+            source_type="rss",
+            section="工具与开源",
+        ),
+        CuratedItem(
+            title="融资新闻",
+            url="https://example.com/funding",
+            summary="融资新闻摘要。",
+            source="media",
+            source_type="rss",
+            section="资本动向",
+        ),
+    ]
+    valid = json.dumps(
+        {
+            "date": "2026-05-09",
+            "title": "T",
+            "sections": [
+                {
+                    "heading": "模型前沿",
+                    "items": [
+                        {
+                            "title": "#1 模型更新",
+                            "summary": "模型更新摘要。",
+                            "url": "https://example.com/model",
+                            "source": "official",
+                        }
+                    ],
+                }
+            ],
+        },
+        ensure_ascii=False,
+    )
+    provider = _provider_emitting(valid)
+    tracer = Tracer(str(tmp_path / "t.jsonl"), run_id="r")
+    budget = BudgetTracker(100_000, 10_000, 10)
+    draft = write_draft(
+        provider=provider,
+        items=items,
+        date="2026-05-09",
+        system_prompt="s",
+        user_template="d={date} m={max_items} i={items_json}",
+        max_items=5,
+        tracer=tracer,
+        budget=budget,
+        complete_with_items=True,
+    )
+    urls = [item.url for section in draft.sections for item in section.items]
+    assert urls == [
+        "https://example.com/model",
+        "https://example.com/tool",
+        "https://example.com/funding",
+    ]
+    assert [section.heading for section in draft.sections] == [
+        "今日头条", "模型前沿", "工具与开源", "论文精选",
+        "产品落地", "资本动向", "产业风向",
+    ]
+
+
+def test_overview_groups_render_in_stable_juya_order():
+    draft = Draft(
+        date="2026-05-09",
+        title="T",
+        overview_groups=[
+            OverviewGroup(heading="论文精选", items=[
+                OverviewEntry(title="Paper", url="https://p.com", item_id="#3", source="arxiv")
+            ]),
+            OverviewGroup(heading="今日头条", items=[
+                OverviewEntry(title="Headline", url="https://h.com", item_id="#1", source="src")
+            ]),
+            OverviewGroup(heading="资本动向", items=[
+                OverviewEntry(title="Capital", url="https://c.com", item_id="#2", source="src")
+            ]),
+        ],
+        sections=[
+            DraftSection(heading="今日头条", items=[
+                DraftItem(title="#1 Headline", summary="s", url="https://h.com", source="src")
+            ]),
+            DraftSection(heading="资本动向", items=[
+                DraftItem(title="#2 Capital", summary="s", url="https://c.com", source="src")
+            ]),
+            DraftSection(heading="论文精选", items=[
+                DraftItem(title="#3 Paper", summary="s", url="https://p.com", source="arxiv")
+            ]),
+        ],
+    )
+    md = render_markdown(draft)
+    assert md.index("### 要闻") < md.index("### 行业动态") < md.index("### 论文精选")
 
 
 def test_writer_rejects_non_json(tmp_path):

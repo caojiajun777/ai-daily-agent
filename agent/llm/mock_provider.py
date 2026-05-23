@@ -50,7 +50,7 @@ class MockLLMProvider:
 
 
 def _default_responder(messages: List[LLMMessage]) -> str:
-    # Deterministic 6-section draft. URLs are extracted from the user message
+    # Deterministic 7-section draft. URLs are extracted from the user message
     # so the critic's hallucination check passes.
     import json as _json
     import re as _re
@@ -59,16 +59,27 @@ def _default_responder(messages: List[LLMMessage]) -> str:
     # Try to find the items_json block and extract real URLs / titles.
     urls: List[str] = _re.findall(r'"url":\s*"(https?://[^"]+)"', last)
     titles: List[str] = _re.findall(r'"title":\s*"([^"]+)"', last)
-    sources: List[str] = _re.findall(r'"source_id":\s*"([^"]+)"', last)
+    sources: List[str] = _re.findall(r'"source":\s*"([^"]+)"', last)
+    if not sources:
+        sources = _re.findall(r'"source_id":\s*"([^"]+)"', last)
 
-    # Build at least 6 slots; repeat the available items if fewer than 6.
+    # Build at least 7 slots; repeat the available items if fewer than 7.
     def _slot(i: int) -> dict:
         url = urls[i % len(urls)] if urls else f"https://example.com/{i}"
         title = titles[i % len(titles)] if titles else f"Mock item {i+1}"
         src = sources[i % len(sources)] if sources else "mock"
-        return {"title": f"#{i+1} {title[:40]}", "summary": f"mock summary {i+1}", "url": url, "source": src}
+        return {
+            "title": f"#{i+1} {title[:40]}",
+            "one_liner": f"mock one-liner {i+1}",
+            "summary": f"mock summary {i+1}",
+            "body_paragraphs": [f"mock summary {i+1}"],
+            "url": url,
+            "source": src,
+            "highlights": [f"要点 {i+1}-1", f"要点 {i+1}-2"],
+            "related_links": [],
+        }
 
-    section_names = ["今日头条", "模型前沿", "工具与开源", "论文精选", "产品落地", "业界风向"]
+    section_names = ["今日头条", "模型前沿", "工具与开源", "论文精选", "产品落地", "资本动向", "产业风向"]
     counter = [0]
 
     def _section(name: str) -> dict:
@@ -76,10 +87,27 @@ def _default_responder(messages: List[LLMMessage]) -> str:
         counter[0] += 1
         return {"heading": name, "items": [item]}
 
+    sections = [_section(n) for n in section_names]
+    overview_groups = []
+    for sec in sections:
+        overview_groups.append({
+            "heading": sec["heading"],
+            "items": [
+                {
+                    "title": item["title"].split(" ", 1)[-1],
+                    "url": item["url"],
+                    "item_id": item["title"].split(" ", 1)[0],
+                    "source": item["source"],
+                }
+                for item in sec["items"]
+            ],
+        })
+
     payload = {
         "date": "1970-01-01",
         "title": "AI 早报 1970-01-01",
         "overview": "今日没有特别重大动态，各模型进展平稳。",
-        "sections": [_section(n) for n in section_names],
+        "overview_groups": overview_groups,
+        "sections": sections,
     }
     return _json.dumps(payload, ensure_ascii=False)

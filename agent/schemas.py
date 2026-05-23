@@ -19,7 +19,25 @@ class CuratedItem(BaseModel):
     source_tier: str = ""
     evidence_type: str = ""
     confidence: str = "medium"
+    section: str = ""
     section_hint: str = ""
+    reliability: str = ""
+    why_it_matters: str = ""
+    writing_angle: str = ""
+    supporting_urls: List[str] = []
+    evidence_snippets: List[str] = []
+
+
+class OverviewEntry(BaseModel):
+    title: str = ""
+    url: str = ""
+    item_id: str = ""
+    source: str = ""
+
+
+class OverviewGroup(BaseModel):
+    heading: str = ""
+    items: List[OverviewEntry] = []
 
 
 class DraftItem(BaseModel):
@@ -34,6 +52,12 @@ class DraftItem(BaseModel):
     source_tier: str = ""
     evidence_type: str = ""
     confidence: str = "medium"
+    one_liner: str = ""                         # short callout shown under the title
+    body_paragraphs: List[str] = []             # richer long-form detail
+    images: List[str] = []                      # multiple evidence/product images
+    item_type: str = ""                         # release | model | tool | product | capital | rumor | paper
+    rumor_level: str = ""                       # confirmed | reported | rumor
+    evidence_note: str = ""
 
 
 class DraftSection(BaseModel):
@@ -45,6 +69,7 @@ class Draft(BaseModel):
     date: str
     title: str
     overview: str = ""
+    overview_groups: List[OverviewGroup] = []
     cover_image: str = ""                        # optional cover image URL
     sections: List[DraftSection]
 

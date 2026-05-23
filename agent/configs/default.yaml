@@ -28,7 +28,7 @@ token_budget:
   max_candidates_after_filter: 120
   max_clusters_after_dedup: 60
   max_writer_items: 18
-  max_items_per_section: 4
+  max_items_per_section: 5
   max_snippet_chars: 500
   budget_overflow_drop_order:
   - community_signal
@@ -98,9 +98,6 @@ content_types:
     source_weight: 1.3
     half_life_h: 120
   founder_signal:
-    source_weight: 1.0
-    half_life_h: 36
-  researcher_signal:
     source_weight: 0.95
     half_life_h: 72
   expert_signal:
@@ -113,7 +110,7 @@ content_types:
     source_weight: 0.9
     half_life_h: 72
   insider_media:
-    source_weight: 1.05
+    source_weight: 1.15
     half_life_h: 72
   insider_reporter_signal:
     source_weight: 0.95
@@ -138,16 +135,19 @@ content_types:
     half_life_h: 24
 curation:
   mode: research_editor
-  candidate_top_k: 40
-  final_min_items: 16
-  final_max_items: 22
+  candidate_top_k: 120
+  final_min_items: 18
+  final_max_items: 24
   history_window_days: 7
   fallback_to_rules: true
   legacy_llm_scoring_enabled: false
-  enable_evidence_fetch: false
+  enable_evidence_fetch: true
   evidence_fetch_timeout_sec: 8
+  evidence_max_events: 24
+  evidence_urls_per_event: 3
   llm_rerank_timeout_sec: 60
   score_floor: 0.1
+  breaking_news_boost: 1.15
 section_quotas:
   research_frontier:
     min: 2
@@ -200,6 +200,20 @@ sources:
   evidence_type: official_release
   section_hint: Model Capability Frontier
   audience_hint: all
+- id: x_gemini_app
+  type: x_cookie
+  username: GeminiApp
+  account_type: official
+  weight: 1.2
+  max_items: 6
+  content_type: official_release
+  source_tier: tier_0_core_evidence
+  reliability: high
+  default_confidence: high
+  evidence_type: official_release
+  section_hint: Model Capability Frontier
+  audience_hint: all
+  notes: "Google Gemini product announcements — captures model releases, feature launches, pricing changes"
 - id: x_metaai
   type: x_cookie
   username: AIatMeta
@@ -766,6 +780,19 @@ sources:
   evidence_type: media_aggregator
   section_hint: Silicon Valley / Community Pulse
   audience_hint: all
+- id: the_decoder
+  type: rss
+  url: https://the-decoder.com/feed/
+  content_type: tech_media
+  weight: 0.85
+  max_items: 6
+  source_tier: tier_2_context_signal
+  reliability: medium
+  default_confidence: medium
+  evidence_type: media_report
+  section_hint: Industry Strategy & Company Moves
+  audience_hint: all
+  notes: "AI news aggregator — picks up Anthropic/OpenAI/Google product and business news early"
 - id: ithome
   type: rss
   url: https://www.ithome.com/rss/
@@ -1287,7 +1314,7 @@ sources:
 - id: bloomberg_ai
   type: rss
   enabled: true
-  url: https://feeds.bloomberg.com/technology/ai.xml
+  url: https://feeds.bloomberg.com/technology/news.rss
   content_type: insider_media
   weight: 1.05
   half_life_h: 72
@@ -1326,6 +1353,70 @@ sources:
   token_risk: low
   reliability_risk: medium
   notes: Use reported language. Feed URL unverified.
+- id: cnbc_ai
+  type: rss
+  enabled: true
+  url: https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000108
+  content_type: insider_media
+  weight: 1.1
+  half_life_h: 72
+  max_items: 8
+  source_tier: tier_1_high_signal
+  reliability: high
+  default_confidence: medium
+  evidence_type: insider_report
+  section_hint: Industry Strategy & Company Moves
+  audience_hint: founder,investor,market_watcher
+  parser_strategy: rss
+  notes: CNBC Technology — covers AI earnings, funding, market moves
+- id: reuters_ai
+  type: rss
+  enabled: true
+  url: https://www.reutersagency.com/feed/?taxonomy=best-sectors&post_type=best&best-sectors=tech
+  content_type: insider_media
+  weight: 1.1
+  half_life_h: 72
+  max_items: 8
+  source_tier: tier_1_high_signal
+  reliability: high
+  default_confidence: medium
+  evidence_type: insider_report
+  section_hint: Industry Strategy & Company Moves
+  audience_hint: founder,investor,market_watcher
+  parser_strategy: rss
+  notes: Reuters — global financial news, often first on AI earnings/corporate moves
+- id: wsj_ai
+  type: rss
+  enabled: true
+  url: https://feeds.a.dj.com/rss/RSSWSJD.xml
+  content_type: insider_media
+  weight: 1.0
+  half_life_h: 72
+  max_items: 5
+  source_tier: tier_1_high_signal
+  reliability: high
+  default_confidence: medium
+  evidence_type: insider_report
+  section_hint: Industry Strategy & Company Moves
+  audience_hint: founder,investor,market_watcher
+  parser_strategy: rss
+  notes: WSJ — premier business news, AI industry coverage
+- id: ft_ai
+  type: rss
+  enabled: true
+  url: https://www.ft.com/technology?format=rss
+  content_type: insider_media
+  weight: 0.95
+  half_life_h: 72
+  max_items: 5
+  source_tier: tier_1_high_signal
+  reliability: high
+  default_confidence: medium
+  evidence_type: insider_report
+  section_hint: Industry Strategy & Company Moves
+  audience_hint: founder,investor,market_watcher
+  parser_strategy: rss
+  notes: Financial Times — global business and tech news
 - id: vc_a16z_ai
   type: x_cookie
   enabled: false

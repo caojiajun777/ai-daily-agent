@@ -17,6 +17,11 @@ class RawItem:
     author: str = ""
     tags: List[str] = None  # type: ignore[assignment]
     content_type: str = "tech_media"  # maps to content_types config key
+    source_tier: str = ""
+    reliability: str = ""
+    evidence_type: str = ""
+    confidence: str = "medium"
+    section_hint: str = ""
 
     def __post_init__(self) -> None:
         if self.tags is None:
@@ -33,6 +38,11 @@ class RawItem:
             "author": self.author,
             "tags": list(self.tags),
             "content_type": self.content_type,
+            "source_tier": self.source_tier,
+            "reliability": self.reliability,
+            "evidence_type": self.evidence_type,
+            "confidence": self.confidence,
+            "section_hint": self.section_hint,
         }
 
 
@@ -91,4 +101,8 @@ def build_source(spec: Dict[str, Any]) -> SourceAdapter:
         from agent.sources.aihot_adapter import AIHotAdapter
 
         return AIHotAdapter(source_id=spec["id"], url=spec["url"])
+    if t == "pricing_snapshot":
+        from agent.sources.pricing_snapshot import PricingSnapshotAdapter
+
+        return PricingSnapshotAdapter(spec=spec)
     raise ValueError(f"unknown source type: {t}")

@@ -76,6 +76,7 @@ jobs:
         run: |
           python << 'PYEOF'
           import os, smtplib
+          from datetime import datetime, timezone
           from email.mime.text import MIMEText
 
           smtp_user = os.getenv("SMTP_USER", "")
@@ -85,16 +86,17 @@ jobs:
               exit(0)
 
           alert_text = "${{ steps.health.outputs.alert_text }}"
-          body = f"""AI 日报系统健康检查告警
-
-  检查时间：$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-  发现问题：
-
-  {alert_text}
-
-  查看详情：https://github.com/{os.getenv('PUBLISH_REPO','caojiajun777/ai-daily-agent')}/actions
-  """
+          body = "\n".join([
+              "AI 日报系统健康检查告警",
+              "",
+              f"检查时间：{datetime.now(timezone.utc).isoformat()}",
+              "",
+              "发现问题：",
+              "",
+              alert_text,
+              "",
+              f"查看详情：https://github.com/{os.getenv('PUBLISH_REPO','caojiajun777/ai-daily-agent')}/actions",
+          ])
 
           msg = MIMEText(body, "plain", "utf-8")
           msg["Subject"] = "⚠ AI 日报系统告警"

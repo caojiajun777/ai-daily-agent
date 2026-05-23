@@ -144,6 +144,143 @@ def test_fake_url_auto_fixed():
     assert output.selected[0].sources_to_use[0].url == "https://official.com"
 
 
+def test_section_validator_moves_obvious_product_out_of_model_frontier():
+    event = EventCluster(
+        event_id="evt_product",
+        canonical_title="AdventHealth advances whole-person care with OpenAI",
+        primary_url="https://openai.com/index/adventhealth",
+        source_urls=["https://openai.com/index/adventhealth"],
+        source_names=["openai_news"], source_types=["rss"], source_count=1,
+        summary="AdventHealth is using ChatGPT for Healthcare to streamline workflows.",
+    )
+    raw = json.dumps({"selected": [{
+        "event_id": "evt_product", "decision": "select",
+        "priority": "high", "section": "模型前沿",
+        "evidence_level": "primary", "novelty": "new_event",
+        "reader_utility": "high", "why_it_matters": "x",
+        "writing_angle": "x", "risk_level": "low",
+        "sources_to_use": [{"url": "https://openai.com/index/adventhealth", "role": "primary"}],
+    }], "rejected": []})
+    output = _parse_and_validate(raw, [event])
+    assert output.selected[0].section == "产品落地"
+
+
+def test_section_validator_moves_model_release_out_of_product():
+    event = EventCluster(
+        event_id="evt_qwen",
+        canonical_title="Meet Qwen3.7-Max — our latest flagship, made for the Agent Era",
+        primary_url="https://x.com/Alibaba_Qwen/status/2057450220708147250",
+        source_urls=["https://x.com/Alibaba_Qwen/status/2057450220708147250"],
+        source_names=["x_qwen"], source_types=["x_cookie"], source_count=1,
+        summary="The new Qwen3.7-Max is live, with big jumps in coding and agent benchmarks over Qwen3.6.",
+    )
+    raw = json.dumps({"selected": [{
+        "event_id": "evt_qwen", "decision": "select",
+        "priority": "high", "section": "产品落地",
+        "evidence_level": "official", "novelty": "new_event",
+        "reader_utility": "high", "why_it_matters": "x",
+        "writing_angle": "x", "risk_level": "low",
+        "sources_to_use": [{"url": event.primary_url, "role": "primary"}],
+    }], "rejected": []})
+    output = _parse_and_validate(raw, [event])
+    assert output.selected[0].section == "模型前沿"
+
+
+def test_section_validator_moves_open_source_model_out_of_tools():
+    event = EventCluster(
+        event_id="evt_hymt",
+        canonical_title="腾讯开源 Hy-MT2 多语言翻译模型，1.8B 版本超越商业 API",
+        primary_url="https://x.com/TencentHunyuan/status/2057384034544804136",
+        source_urls=["https://x.com/TencentHunyuan/status/2057384034544804136"],
+        source_names=["x_tencent_hunyuan"], source_types=["x_cookie"], source_count=1,
+        summary="7B 与 30B-A3B 版本达到开源模型先进翻译性能，1.8B 版本可在手机端运行。",
+    )
+    raw = json.dumps({"selected": [{
+        "event_id": "evt_hymt", "decision": "select",
+        "priority": "high", "section": "工具与开源",
+        "evidence_level": "official", "novelty": "new_event",
+        "reader_utility": "high", "why_it_matters": "x",
+        "writing_angle": "x", "risk_level": "low",
+        "sources_to_use": [{"url": event.primary_url, "role": "primary"}],
+    }], "rejected": []}, ensure_ascii=False)
+    output = _parse_and_validate(raw, [event])
+    assert output.selected[0].section == "模型前沿"
+
+
+def test_section_validator_keeps_model_powered_agent_tool_out_of_model_frontier():
+    event = EventCluster(
+        event_id="evt_datasette",
+        canonical_title="Datasette Agent",
+        primary_url="https://simonwillison.net/2026/May/21/datasette-agent",
+        source_urls=["https://simonwillison.net/2026/May/21/datasette-agent"],
+        source_names=["aihot:Simon Willison 博客"], source_types=["aihot"], source_count=1,
+        primary_source_tier="tier_3_pulse_noise",
+        summary=(
+            "Datasette Agent 是 Datasette 推出的首个可扩展 AI 助手，"
+            "支持通过插件生成图表，也可运行于 Gemini 3.1 Flash-Lite 等云端模型。"
+        ),
+    )
+    raw = json.dumps({"selected": [{
+        "event_id": "evt_datasette", "decision": "select",
+        "priority": "high", "section": "模型前沿",
+        "evidence_level": "primary", "novelty": "new_event",
+        "reader_utility": "high", "why_it_matters": "x",
+        "writing_angle": "x", "risk_level": "low",
+        "sources_to_use": [{"url": event.primary_url, "role": "primary"}],
+    }], "rejected": []}, ensure_ascii=False)
+    output = _parse_and_validate(raw, [event])
+    assert output.selected[0].section == "产业风向"
+
+
+def test_final_selector_normalizes_model_release_sections():
+    event = EventCluster(
+        event_id="evt_qwen",
+        canonical_title="Meet Qwen3.7-Max — our latest flagship, made for the Agent Era",
+        primary_url="https://x.com/Alibaba_Qwen/status/2057450220708147250",
+        source_urls=["https://x.com/Alibaba_Qwen/status/2057450220708147250"],
+        source_names=["x_qwen"], source_types=["x_cookie"], source_count=1,
+        summary="The new Qwen3.7-Max is live with coding and agent benchmark gains.",
+        rule_score=0.9,
+    )
+    output = ResearchEditorOutput(selected=[
+        EditorialDecision(
+            event_id="evt_qwen", decision="select", priority="high",
+            section="产品落地", evidence_level="official", novelty="new_event",
+            reader_utility="high", why_it_matters="x", writing_angle="x",
+            risk_level="low", sources_to_use=[SourceUse(url=event.primary_url)],
+        )
+    ], rejected=[])
+    items, recs, meta = select_final_items(
+        editor_output=output, events=[event], min_items=1, max_items=3, min_papers=0)
+    assert items[0].section == "模型前沿"
+    assert meta["section_normalized_count"] == 1
+
+
+def test_final_selector_normalizes_agent_tool_sections():
+    event = EventCluster(
+        event_id="evt_datasette",
+        canonical_title="Datasette Agent",
+        primary_url="https://simonwillison.net/2026/May/21/datasette-agent",
+        source_urls=["https://simonwillison.net/2026/May/21/datasette-agent"],
+        source_names=["aihot:Simon Willison 博客"], source_types=["aihot"], source_count=1,
+        primary_source_tier="tier_3_pulse_noise",
+        summary="A conversational AI assistant for querying data, generating charts through plugins, and using Gemini models.",
+        rule_score=0.6,
+    )
+    output = ResearchEditorOutput(selected=[
+        EditorialDecision(
+            event_id="evt_datasette", decision="select", priority="high",
+            section="模型前沿", evidence_level="primary", novelty="new_event",
+            reader_utility="high", why_it_matters="x", writing_angle="x",
+            risk_level="low", sources_to_use=[SourceUse(url=event.primary_url)],
+        )
+    ], rejected=[])
+    items, recs, meta = select_final_items(
+        editor_output=output, events=[event], min_items=1, max_items=3, min_papers=0)
+    assert items[0].section == "产业风向"
+    assert meta["section_normalized_count"] == 1
+
+
 # Final Selector
 
 def test_fallback_when_llm_empty():
@@ -156,6 +293,51 @@ def test_fallback_when_llm_empty():
         editor_output=output, events=events, min_items=16, max_items=22)
     assert meta["fallback_used"]
     assert len(items) >= 16
+
+
+def test_selector_backfills_missing_sections_from_all_events():
+    events = [
+        EventCluster(event_id="evt_head", canonical_title="OpenAI launches a new assistant feature",
+                     primary_url="https://example.com/head", source_urls=["https://example.com/head"],
+                     source_names=["openai"], source_types=["rss"], source_count=1,
+                     summary="A product feature launch.", rule_score=0.95),
+        EventCluster(event_id="evt_model", canonical_title="Gemini 4 model benchmark improves coding",
+                     primary_url="https://example.com/model", source_urls=["https://example.com/model"],
+                     source_names=["google"], source_types=["rss"], source_count=1,
+                     summary="A model benchmark update.", rule_score=0.9),
+        EventCluster(event_id="evt_tool", canonical_title="New GitHub SDK open source tool",
+                     primary_url="https://example.com/tool", source_urls=["https://example.com/tool"],
+                     source_names=["github"], source_types=["rss"], source_count=1,
+                     summary="A developer tool is open source.", rule_score=0.88),
+        EventCluster(event_id="evt_capital", canonical_title="AI startup raises Series B funding",
+                     primary_url="https://example.com/capital", source_urls=["https://example.com/capital"],
+                     source_names=["media"], source_types=["rss"], source_count=1,
+                     summary="Funding round for an AI startup.", rule_score=0.86),
+        EventCluster(event_id="evt_policy", canonical_title="AI regulation law gains support",
+                     primary_url="https://example.com/policy", source_urls=["https://example.com/policy"],
+                     source_names=["media2"], source_types=["rss"], source_count=1,
+                     summary="A policy and regulation update.", rule_score=0.84),
+    ]
+    output = ResearchEditorOutput(selected=[
+        EditorialDecision(
+            event_id="evt_head", decision="select", priority="high",
+            section="今日头条", evidence_level="primary", novelty="new_event",
+            reader_utility="high", why_it_matters="x", writing_angle="x",
+            risk_level="low", sources_to_use=[],
+        )
+    ], rejected=[])
+
+    items, recs, meta = select_final_items(
+        editor_output=output,
+        events=events,
+        min_items=5,
+        max_items=7,
+        min_papers=0,
+    )
+
+    sections = {item.section for item in items}
+    assert len(items) >= 5
+    assert {"模型前沿", "工具与开源", "资本动向", "产业风向"} <= sections
 
 
 # URL validation — fabricated URLs are dropped with warnings

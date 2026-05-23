@@ -139,21 +139,9 @@ def _renumber_draft(draft: Draft) -> Draft:
             counter += 1
             # Replace or prepend the #N prefix.
             title = re.sub(r"^#\d+\s*", "", item.title).strip()
-            new_items.append(
-                DraftItem(
-                    title=f"#{counter} {title}",
-                    summary=item.summary,
-                    url=item.url,
-                    source=item.source,
-                )
-            )
+            new_items.append(item.model_copy(update={"title": f"#{counter} {title}"}))
         new_sections.append(DraftSection(heading=sec.heading, items=new_items))
-    return Draft(
-        date=draft.date,
-        title=draft.title,
-        overview=draft.overview,
-        sections=new_sections,
-    )
+    return draft.model_copy(update={"sections": new_sections, "overview_groups": []})
 
 
 def _strip_think(text: str) -> str:
@@ -183,6 +171,7 @@ def apply_repair_actions(
     draft: Draft,
     actions: List[RepairAction],
     allowed_urls: Set[str],
+    replacement_records: Optional[Dict[str, CuratedItemRecord]] = None,
 ) -> Tuple[Draft, List[RepairAction]]:
     """Apply validated repair actions to the draft.
 
@@ -223,18 +212,34 @@ def apply_repair_actions(
 
         if action.replacement_url:
             # Replace in-place.
-            target_sec.items[remove_idx] = DraftItem(
-                title=action.replacement_title or action.removed_title,
-                summary="（替补条目）",
-                url=action.replacement_url,
-                source="curated",
-            )
+            rec = (replacement_records or {}).get(action.replacement_url)
+            if rec:
+                replacement = DraftItem(
+                    title=action.replacement_title or rec.title,
+                    summary=rec.title,
+                    body_paragraphs=[rec.title],
+                    url=rec.source_url,
+                    source=rec.source_name,
+                    related_links=[],
+                    content_type=rec.content_type,
+                    source_tier=rec.source_tier,
+                    evidence_type=rec.evidence_type,
+                    confidence=rec.confidence,
+                    evidence_note="replacement from curated artifact",
+                )
+            else:
+                replacement = DraftItem(
+                    title=action.replacement_title or action.removed_title,
+                    summary=action.replacement_title or "（替补条目）",
+                    body_paragraphs=[action.replacement_title or "（替补条目）"],
+                    url=action.replacement_url,
+                    source="curated",
+                )
+            target_sec.items[remove_idx] = replacement
         else:
-            # Drop the item; keep section alive only if ≥1 item remains.
-            if len(target_sec.items) > 1:
-                target_sec.items.pop(remove_idx)
-            # If this would empty the section and no replacement provided,
-            # leave the item (don't create an empty section).
+            # Drop the duplicate even if it leaves a section empty. A sparse
+            # section is better than knowingly publishing duplicate stories.
+            target_sec.items.pop(remove_idx)
 
         applied.append(action)
 
@@ -383,7 +388,10 @@ def repair_draft(
         tracer.log("repair_failed", reason=report.reason)
         return draft, report
 
-    repaired, applied = apply_repair_actions(draft, actions, allowed_urls)
+    replacement_records = {r.source_url: r for r in curated_records}
+    repaired, applied = apply_repair_actions(
+        draft, actions, allowed_urls, replacement_records
+    )
 
     if not applied:
         report = RepairReport(
