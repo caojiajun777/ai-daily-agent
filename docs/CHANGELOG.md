@@ -101,3 +101,19 @@ non-academic Anthropic 产品更新（Claude Code changelog、合作伙伴案例
 | 18 | `_guess_section` 将 arXiv 源类型检查提到所有关键词之前 | `final_selector.py` |
 | 19 | Writer 硬性要求第 7 条：论文精选只能放 arxiv_top_venue/hf_daily_papers 条目 | `prompts.yaml` |
 | 20 | ResearchEditor 论文精选描述明确排除"软件 changelog、技术博客、案例研究" | `research_editor.py` `prompts.yaml` |
+
+## v2.6 (2026-05-23) — Juya-style 自动编辑审核
+
+### 问题
+日报已经能自动发布，但选题仍像“规则聚合”：论文和大厂官方博客偏重，API 价格、国产模型、开发工具等中文读者高价值信息容易排不到前面；未确认融资和 A/B 测试也会混入主板块。
+
+### 改动
+
+| # | 改动 | 文件 | 效果 |
+|---|------|------|------|
+| 21 | 7 板块切换为 `要闻/模型发布/开发生态/技术与洞察/产品应用/行业动态/前瞻与传闻` | `section_classifier.py` `final_selector.py` `writer.py` `research_editor.py` `prompts.yaml` | 接近 Juya 的人工编辑分组 |
+| 22 | 移除论文 min 5 和资本 min 2 的机械保底，改为核心板块软覆盖 | `final_selector.py` | 不再为了填栏目牺牲选题质量 |
+| 23 | LLM reranker 加入中文读者和可行动信息偏好 | `llm_reranker.py` `event_scorer.py` | DeepSeek/Qwen/智谱、价格、API、工具更新更容易进入前排 |
+| 24 | 新增传闻/前瞻隔离规则，弱信号最多 2 条 | `section_classifier.py` `final_selector.py` `research_editor.py` | 未确认消息不再污染主新闻判断 |
+| 25 | 收紧相关链接聚合，移除过宽 `codex` story key | `final_selector.py` | 减少无关参考链接混入正文 |
+| 26 | Writer fallback 输出人类可读证据说明，避免裸露 tier/evidence 元数据 | `writer.py` | 内容更像编辑稿，少像调试信息 |

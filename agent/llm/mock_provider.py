@@ -79,7 +79,7 @@ def _default_responder(messages: List[LLMMessage]) -> str:
             "related_links": [],
         }
 
-    section_names = ["今日头条", "模型前沿", "工具与开源", "论文精选", "产品落地", "资本动向", "产业风向"]
+    section_names = ["要闻", "模型发布", "开发生态", "技术与洞察", "产品应用", "行业动态", "前瞻与传闻"]
     counter = [0]
 
     def _section(name: str) -> dict:

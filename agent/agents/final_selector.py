@@ -2,7 +2,7 @@
 
 Enforces section diversity, source diversity, and min/max item counts.
 Falls back to rule_score ordering if LLM decisions are insufficient.
-Guarantees a minimum number of arxiv papers in the final selection.
+Uses section caps without forcing low-value filler stories.
 """
 
 from __future__ import annotations
@@ -21,7 +21,23 @@ from agent.agents.research_editor import (
 from agent.agents.section_classifier import guess_section as _classify_section
 from agent.schemas import CuratedItem, CuratedItemRecord
 
-_MIN_PAPERS = 5
+_MIN_PAPERS = 0
+
+SECTION_ORDER = [
+    "要闻", "模型发布", "开发生态", "技术与洞察",
+    "产品应用", "行业动态", "前瞻与传闻",
+]
+
+SECTION_ALIASES = {
+    "今日头条": "要闻",
+    "模型前沿": "模型发布",
+    "工具与开源": "开发生态",
+    "论文精选": "技术与洞察",
+    "产品落地": "产品应用",
+    "资本动向": "行业动态",
+    "产业风向": "行业动态",
+    "业界风向": "行业动态",
+}
 
 
 def select_final_items(
@@ -102,11 +118,15 @@ def select_final_items(
     source_counts: Counter = Counter()
     story_counts: Counter = Counter()
     section_caps: Dict[str, int] = {
-        "今日头条": 3, "模型前沿": 4, "工具与开源": 3,
-        "论文精选": 5, "产品落地": 3,
-        "资本动向": 3, "产业风向": 4,
+        "要闻": 3,
+        "模型发布": 4,
+        "开发生态": 5,
+        "技术与洞察": 3,
+        "产品应用": 4,
+        "行业动态": 4,
+        "前瞻与传闻": 2,
     }
-    section_order = ["今日头条", "模型前沿", "工具与开源", "论文精选", "产品落地", "资本动向", "产业风向"]
+    section_order = SECTION_ORDER
     ranked_events = sorted(events, key=lambda e: e.rule_score, reverse=True)
 
     def ensure_decision(
@@ -151,9 +171,9 @@ def select_final_items(
         if _is_stale_background_event(evt):
             return False
         sec = section or (all_decisions.get(evt.event_id).section if all_decisions.get(evt.event_id) else "")
-        sec = sec or _guess_section(evt)
+        sec = _normalize_section(sec or _guess_section(evt))
         cap = section_caps.get(sec, 4)
-        if sec == "论文精选" and section_counts.get(sec, 0) >= cap:
+        if sec == "技术与洞察" and section_counts.get(sec, 0) >= cap:
             return False
         if respect_caps and section_counts.get(sec, 0) >= cap:
             return False
@@ -162,7 +182,7 @@ def select_final_items(
             return False
 
         dec, created = ensure_decision(evt, sec, priority=priority)
-        if created or dec.section not in section_order:
+        if created or _normalize_section(dec.section or "") not in section_order:
             dec.section = sec
         final_ids.append(evt.event_id)
         section_counts[sec] += 1
@@ -179,7 +199,7 @@ def select_final_items(
             evt = event_map.get(eid)
             if evt and _is_stale_background_event(evt):
                 continue
-            sec = d.section or "产业风向"
+            sec = _normalize_section(d.section or "行业动态")
             key = _story_key(evt)
             if section_counts.get(sec, 0) >= section_caps.get(sec, 4):
                 continue
@@ -198,11 +218,13 @@ def select_final_items(
         if d.priority == "must_include":
             continue
 
-        sec = d.section or "产业风向"
+        sec = _normalize_section(d.section or "行业动态")
 
         # Section cap check.
         cap = section_caps.get(sec, 4)
-        if section_counts.get(sec, 0) >= cap and d.priority not in ("high",):
+        if section_counts.get(sec, 0) >= cap and (
+            sec == "前瞻与传闻" or d.priority not in ("high",)
+        ):
             continue
 
         # Source diversity: max 3 from same source (for the whole draft).
@@ -227,16 +249,19 @@ def select_final_items(
         for s in (evt.source_names if evt else []):
             source_counts[s] += 1
 
-    # Ensure all 7 sections have at least 1 item.
+    # Nudge coverage for the sections readers most expect, but do not force
+    # low-value filler or a rumor item just to make every bucket non-empty.
     covered = set(section_counts.keys())
-    missing = [s for s in section_order if s not in covered]
+    preferred_sections = ["模型发布", "开发生态", "技术与洞察", "行业动态"]
+    missing = [s for s in preferred_sections if s not in covered]
     for eid in sorted_ids:
         if not missing or len(final_ids) >= max_items:
             break
         if eid in final_ids:
             continue
         d = all_decisions[eid]
-        if d.section in missing:
+        d_section = _normalize_section(d.section or "")
+        if d_section in missing:
             evt = event_map.get(eid)
             if evt and _is_stale_background_event(evt):
                 continue
@@ -244,13 +269,12 @@ def select_final_items(
             if key and story_counts.get(key, 0) >= 1:
                 continue
             final_ids.append(eid)
-            section_counts[d.section] += 1
+            section_counts[d_section] += 1
             if key:
                 story_counts[key] += 1
-            missing.remove(d.section)
+            missing.remove(d_section)
 
-    # The editor may omit an entire section even when the collector found good
-    # candidates. Pull section fillers from the full event pool before giving up.
+    # Pull strong section fillers from the full event pool before giving up.
     if missing and len(final_ids) < max_items:
         for sec in list(missing):
             for evt in ranked_events:
@@ -259,34 +283,6 @@ def select_final_items(
                 if try_add_event(evt, section=sec, respect_caps=False, respect_story=True):
                     missing.remove(sec)
                     break
-
-    # Ensure 资本动向 has at least 2 items (financial news quota).
-    if section_counts.get("资本动向", 0) < 2 and len(final_ids) < max_items:
-        for eid in sorted_ids:
-            if len(final_ids) >= max_items or section_counts.get("资本动向", 0) >= 2:
-                break
-            if eid in final_ids:
-                continue
-            d = all_decisions[eid]
-            if d.section == "资本动向":
-                evt = event_map.get(eid)
-                if evt and _is_stale_background_event(evt):
-                    continue
-                key = _story_key(evt)
-                if key and story_counts.get(key, 0) >= 1:
-                    continue
-                final_ids.append(eid)
-                section_counts["资本动向"] += 1
-                if key:
-                    story_counts[key] += 1
-
-    if section_counts.get("资本动向", 0) < 2 and len(final_ids) < max_items:
-        for evt in ranked_events:
-            if section_counts.get("资本动向", 0) >= 2:
-                break
-            if _guess_section(evt) != "资本动向":
-                continue
-            try_add_event(evt, section="资本动向", respect_caps=False, respect_story=True)
 
     # If diversity caps leave us short, backfill with high-scoring non-paper
     # events that the editor did not explicitly select. This keeps the daily
@@ -300,7 +296,7 @@ def select_final_items(
             if evt.event_id in known_ids:
                 continue
             sec = _guess_section(evt)
-            if sec == "论文精选":
+            if sec == "技术与洞察" and section_counts.get(sec, 0) >= section_caps[sec]:
                 continue
             if _is_stale_background_event(evt):
                 continue
@@ -335,9 +331,9 @@ def select_final_items(
                 if eid in final_ids:
                     continue
                 d = all_decisions[eid]
-                sec = d.section or "产业风向"
+                sec = _normalize_section(d.section or "行业动态")
                 cap = section_caps.get(sec, 4)
-                if sec == "论文精选" and section_counts.get(sec, 0) >= cap:
+                if sec == "技术与洞察" and section_counts.get(sec, 0) >= cap:
                     continue
                 if respect_caps and section_counts.get(sec, 0) >= cap:
                     continue
@@ -359,7 +355,7 @@ def select_final_items(
             if len(final_ids) >= min_items:
                 break
             sec = _guess_section(evt)
-            if sec == "论文精选" and section_counts.get(sec, 0) >= section_caps["论文精选"]:
+            if sec == "技术与洞察" and section_counts.get(sec, 0) >= section_caps["技术与洞察"]:
                 continue
             if _is_stale_background_event(evt):
                 continue
@@ -433,7 +429,7 @@ def select_final_items(
                     primary_url = s.url
                     break
 
-        section = dec.section if dec and dec.section else _guess_section(evt)
+        section = _normalize_section(dec.section if dec and dec.section else _guess_section(evt))
         primary_source_name = evt.primary_source_name or (
             evt.source_names[0] if evt.source_names else "unknown"
         )
@@ -517,7 +513,7 @@ def _supporting_urls(
     seen = set()
     out: List[str] = []
     for url in urls:
-        if not url or url in seen:
+        if not url or url in seen or _is_social_profile_url(url):
             continue
         seen.add(url)
         out.append(url)
@@ -530,7 +526,7 @@ def _merge_urls(base: List[str], extra: List[str], primary_url: str, limit: int 
     merged = []
     seen = {primary_url}
     for url in [*base, *extra]:
-        if not url or url in seen:
+        if not url or url in seen or _is_social_profile_url(url):
             continue
         seen.add(url)
         merged.append(url)
@@ -539,22 +535,85 @@ def _merge_urls(base: List[str], extra: List[str], primary_url: str, limit: int 
     return merged
 
 
+def _is_social_profile_url(url: str) -> bool:
+    """Skip bare social profile URLs in related links.
+
+    Clustered social account homepages are useful during discovery, but they
+    are poor evidence links and can look unrelated in the final article.
+    """
+    m = re.match(r"^https?://(?:www\.)?(?:x|twitter)\.com/([^/?#]+)/*(?:[?#].*)?$", url or "", re.I)
+    if not m:
+        return False
+    account = m.group(1).lower()
+    return account not in {"i", "home", "search", "explore"}
+
+
 def _normalize_decision_sections(
     decisions: Dict[str, EditorialDecision],
     event_map: Dict[str, EventCluster],
 ) -> int:
     changed = 0
     for event_id, dec in decisions.items():
-        if dec.decision != "select" or dec.section == "今日头条":
+        old_section = dec.section or ""
+        normalized = _normalize_section(old_section)
+        if normalized != old_section:
+            dec.section = normalized
+            changed += 1
+        if dec.decision != "select":
             continue
         evt = event_map.get(event_id)
         if evt is None:
+            continue
+        if dec.section == "要闻":
+            if _can_stay_headline(evt):
+                continue
+            dec.section = _guess_section(evt)
+            changed += 1
+            continue
+        if _is_actionable_pricing_headline(evt):
+            if dec.section != "要闻":
+                dec.section = "要闻"
+                changed += 1
             continue
         guessed = _guess_section(evt)
         if guessed and guessed != dec.section:
             dec.section = guessed
             changed += 1
     return changed
+
+
+def _normalize_section(section: str) -> str:
+    if not section:
+        return "行业动态"
+    return SECTION_ALIASES.get(section, section if section in SECTION_ORDER else "行业动态")
+
+
+def _is_actionable_pricing_headline(evt: EventCluster) -> bool:
+    text = f"{evt.canonical_title} {evt.summary}".lower()
+    meta = f"{evt.primary_content_type} {evt.primary_evidence_type} {evt.primary_source_tier}".lower()
+    has_pricing_evidence = any(k in meta for k in (
+        "pricing_page", "china_model_pricing", "official_docs",
+    ))
+    has_actionable_change = any(k in text for k in (
+        "price", "pricing", "discount", "free", "byok",
+        "降价", "定价", "价格", "优惠", "免费", "永久", "1/4", "2.5 折", "2.5折",
+    ))
+    return has_pricing_evidence and has_actionable_change
+
+
+def _can_stay_headline(evt: EventCluster) -> bool:
+    if _is_actionable_pricing_headline(evt):
+        return True
+    tier = (evt.primary_source_tier or "").lower()
+    confidence = (evt.primary_confidence or "").lower()
+    evidence = (evt.primary_evidence_type or "").lower()
+    if "tier_3" in tier or confidence == "low":
+        return False
+    return evidence in {
+        "official_release", "official_docs", "pricing_page", "paper",
+        "research_paper", "financial_report", "benchmark_tracker",
+        "github_release", "product_changelog",
+    } or "tier_0" in tier or "tier_1" in tier
 
 
 def _story_key(evt: Optional[EventCluster]) -> str:
@@ -567,7 +626,6 @@ def _story_key(evt: Optional[EventCluster]) -> str:
         r"\bgpt-\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
         r"\bclaude\s*\d+(?:\.\d+)*(?:\s*[a-z]+)?\b",
         r"\bgemini\s*\d+(?:\.\d+)*(?:\s*[a-z]+)?\b",
-        r"\bcodex\b",
         r"\bcopilot\s+for\s+eclipse\b",
     ]
     for pattern in patterns:
@@ -587,12 +645,12 @@ def _fallback_why_it_matters(evt: EventCluster) -> str:
 
 def _fallback_writing_angle(evt: EventCluster, section: str) -> str:
     angle_by_section = {
-        "模型前沿": "关注模型能力、可用性和开发者接入价值。",
-        "工具与开源": "关注它对开发流程、开源生态或本地部署的影响。",
-        "产品落地": "关注真实用户场景和产品化路径。",
-        "资本动向": "关注资金、估值和产业资源流向，不写投资建议。",
-        "产业风向": "关注政策、公司战略和行业格局信号。",
-        "论文精选": "关注方法亮点、适用场景和工程启发。",
+        "模型发布": "关注模型能力、可用性和开发者接入价值。",
+        "开发生态": "关注它对开发流程、开源生态或本地部署的影响。",
+        "产品应用": "关注真实用户场景和产品化路径。",
+        "行业动态": "关注政策、商业、资金和行业格局信号。",
+        "技术与洞察": "关注方法亮点、可信数据和工程启发。",
+        "前瞻与传闻": "明确标注未确认状态，只写可核查线索。",
     }
     return angle_by_section.get(section, f"基于 {evt.source_count} 个来源提炼关键信息。")
 
@@ -685,5 +743,5 @@ def _staleness_exempt(evt: EventCluster) -> bool:
 
 
 def _guess_section(evt: EventCluster) -> str:
-    """Guess section from event content — v2.3 seven-section layout."""
-    return _classify_section(evt)
+    """Guess section from event content."""
+    return _normalize_section(_classify_section(evt))

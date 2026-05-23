@@ -136,22 +136,22 @@ content_types:
 curation:
   mode: research_editor
   candidate_top_k: 120
-  final_min_items: 18
-  final_max_items: 24
+  final_min_items: 14
+  final_max_items: 18
   history_window_days: 7
   fallback_to_rules: true
   legacy_llm_scoring_enabled: false
   enable_evidence_fetch: true
-  evidence_fetch_timeout_sec: 8
-  evidence_max_events: 24
-  evidence_urls_per_event: 3
+  evidence_fetch_timeout_sec: 5
+  evidence_max_events: 18
+  evidence_urls_per_event: 2
   llm_rerank_timeout_sec: 60
   score_floor: 0.1
   breaking_news_boost: 1.15
 section_quotas:
   research_frontier:
-    min: 2
-    max: 4
+    min: 0
+    max: 3
 publish:
   minimum_items: 3
   max_eval_issues: 0
@@ -876,7 +876,17 @@ sources:
   audience_hint: developer,founder
   parser_strategy: static_config
   provider: deepseek
-  source_url: https://api-docs.deepseek.com/quick_start/pricing
+  source_url: https://api-docs.deepseek.com/zh-cn/quick_start/pricing
+  featured_candidates:
+  - title: DeepSeek-V4-Pro API 2.5 折优惠转为永久正式定价
+    url: https://api-docs.deepseek.com/zh-cn/quick_start/pricing
+    summary: DeepSeek 官方定价页显示，DeepSeek-V4-Pro API 原 2.5 折优惠将在 5 月 31 日结束后转为永久正式定价，价格为原定价的 1/4；每百万 tokens 缓存未命中输入 3 元、输出 6 元，缓存命中输入 0.025 元。
+    published_at: '2026-05-23T00:00:00+08:00'
+    candidate_until: '2026-06-02'
+    tags:
+    - pricing
+    - deepseek
+    - china-model
   pricing_records:
   - model: deepseek-chat
     input_price_per_m: 0.27

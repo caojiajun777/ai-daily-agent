@@ -1,4 +1,10 @@
-"""RSS source adapter using feedparser."""
+"""RSS source adapter using feedparser.
+
+``feedparser.parse(url)`` delegates network fetching to urllib without a
+project-level timeout. A single slow RSS endpoint can therefore stall the
+whole daily run. We fetch bytes ourselves with httpx first, then let
+feedparser handle only parsing.
+"""
 
 from __future__ import annotations
 
@@ -6,18 +12,27 @@ from typing import List
 
 from agent.sources.base import RawItem
 
+DEFAULT_RSS_TIMEOUT_SEC = 12.0
+
 
 class RssAdapter:
     type_name = "rss"
 
-    def __init__(self, source_id: str, url: str) -> None:
+    def __init__(
+        self,
+        source_id: str,
+        url: str,
+        *,
+        timeout_sec: float = DEFAULT_RSS_TIMEOUT_SEC,
+    ) -> None:
         self.source_id = source_id
         self.url = url
+        self.timeout_sec = timeout_sec
 
     def fetch(self, *, max_items: int = 20) -> List[RawItem]:
         import feedparser
 
-        parsed = feedparser.parse(self.url)
+        parsed = feedparser.parse(_download_feed(self.url, self.timeout_sec))
         items: List[RawItem] = []
         for entry in parsed.entries[:max_items]:
             items.append(
@@ -33,6 +48,29 @@ class RssAdapter:
                 )
             )
         return items
+
+
+def _download_feed(url: str, timeout_sec: float) -> bytes:
+    if not url.startswith(("http://", "https://")):
+        from pathlib import Path
+
+        path = url.removeprefix("file://")
+        return Path(path).read_bytes()
+
+    import httpx
+
+    timeout = httpx.Timeout(
+        timeout=max(1.0, float(timeout_sec)),
+        connect=min(5.0, max(1.0, float(timeout_sec))),
+    )
+    headers = {
+        "User-Agent": "report-agent-rss/0.1",
+        "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+    }
+    with httpx.Client(timeout=timeout, follow_redirects=True, headers=headers) as client:
+        resp = client.get(url)
+        resp.raise_for_status()
+        return resp.content
 
 
 def _extract_summary(entry) -> str:

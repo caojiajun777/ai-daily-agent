@@ -75,7 +75,7 @@ def test_writer_can_complete_omitted_curated_items(tmp_path):
             summary="模型更新摘要。",
             source="official",
             source_type="rss",
-            section="模型前沿",
+            section="模型发布",
         ),
         CuratedItem(
             title="开源工具",
@@ -83,7 +83,7 @@ def test_writer_can_complete_omitted_curated_items(tmp_path):
             summary="开源工具摘要。",
             source="github",
             source_type="rss",
-            section="工具与开源",
+            section="开发生态",
         ),
         CuratedItem(
             title="融资新闻",
@@ -91,7 +91,7 @@ def test_writer_can_complete_omitted_curated_items(tmp_path):
             summary="融资新闻摘要。",
             source="media",
             source_type="rss",
-            section="资本动向",
+            section="行业动态",
         ),
     ]
     valid = json.dumps(
@@ -100,7 +100,7 @@ def test_writer_can_complete_omitted_curated_items(tmp_path):
             "title": "T",
             "sections": [
                 {
-                    "heading": "模型前沿",
+                    "heading": "模型发布",
                     "items": [
                         {
                             "title": "#1 模型更新",
@@ -135,8 +135,8 @@ def test_writer_can_complete_omitted_curated_items(tmp_path):
         "https://example.com/funding",
     ]
     assert [section.heading for section in draft.sections] == [
-        "今日头条", "模型前沿", "工具与开源", "论文精选",
-        "产品落地", "资本动向", "产业风向",
+        "要闻", "模型发布", "开发生态", "技术与洞察",
+        "产品应用", "行业动态", "前瞻与传闻",
     ]
 
 
@@ -145,30 +145,30 @@ def test_overview_groups_render_in_stable_juya_order():
         date="2026-05-09",
         title="T",
         overview_groups=[
-            OverviewGroup(heading="论文精选", items=[
+            OverviewGroup(heading="技术与洞察", items=[
                 OverviewEntry(title="Paper", url="https://p.com", item_id="#3", source="arxiv")
             ]),
-            OverviewGroup(heading="今日头条", items=[
+            OverviewGroup(heading="要闻", items=[
                 OverviewEntry(title="Headline", url="https://h.com", item_id="#1", source="src")
             ]),
-            OverviewGroup(heading="资本动向", items=[
+            OverviewGroup(heading="行业动态", items=[
                 OverviewEntry(title="Capital", url="https://c.com", item_id="#2", source="src")
             ]),
         ],
         sections=[
-            DraftSection(heading="今日头条", items=[
+            DraftSection(heading="要闻", items=[
                 DraftItem(title="#1 Headline", summary="s", url="https://h.com", source="src")
             ]),
-            DraftSection(heading="资本动向", items=[
+            DraftSection(heading="行业动态", items=[
                 DraftItem(title="#2 Capital", summary="s", url="https://c.com", source="src")
             ]),
-            DraftSection(heading="论文精选", items=[
+            DraftSection(heading="技术与洞察", items=[
                 DraftItem(title="#3 Paper", summary="s", url="https://p.com", source="arxiv")
             ]),
         ],
     )
     md = render_markdown(draft)
-    assert md.index("### 要闻") < md.index("### 行业动态") < md.index("### 论文精选")
+    assert md.index("### 要闻") < md.index("### 技术与洞察") < md.index("### 行业动态")
 
 
 def test_writer_rejects_non_json(tmp_path):

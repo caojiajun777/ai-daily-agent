@@ -61,6 +61,7 @@ def build_source(spec: Dict[str, Any]) -> SourceAdapter:
         return RssAdapter(
             source_id=spec["id"],
             url=spec["url"],
+            timeout_sec=float(spec.get("timeout_sec", spec.get("fetch_timeout_sec", 12.0))),
         )
     if t == "arxiv":
         from agent.sources.arxiv_adapter import ArxivAdapter

@@ -2,7 +2,7 @@ import json
 import re
 
 from agent.agents.event_clusterer import EventCluster
-from agent.agents.llm_reranker import llm_rerank_events
+from agent.agents.llm_reranker import _extract_json_array, llm_rerank_events
 from agent.llm.mock_provider import MockLLMProvider
 
 
@@ -50,3 +50,8 @@ def test_llm_reranker_scores_second_chunk():
     )
     assert len(calls) == 2
     assert ranked[0].event_id == "evt_44"
+
+
+def test_extract_json_array_handles_unclosed_code_fence():
+    raw = "```json\n[{\"event_id\":\"evt_1\"}]"
+    assert _extract_json_array(raw) == '[{"event_id":"evt_1"}]'

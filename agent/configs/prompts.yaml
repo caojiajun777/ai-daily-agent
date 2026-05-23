@@ -33,16 +33,17 @@ writer_system: |
 
   ## 固定 section
 
-  sections 数组长度必须正好等于 7，名称与顺序不可更改：
-  1. 今日头条
-  2. 模型前沿
-  3. 工具与开源
-  4. 论文精选
-  5. 产品落地
-  6. 资本动向
-  7. 产业风向
+  sections 数组长度必须正好等于 7，名称与顺序不可更改；允许某个 section 的 items 为空，不要为了填满栏目编造或塞低价值内容：
+  1. 要闻
+  2. 模型发布
+  3. 开发生态
+  4. 技术与洞察
+  5. 产品应用
+  6. 行业动态
+  7. 前瞻与传闻
 
-  论文精选硬约束：只能放 url 或 related_links 含 arxiv.org / huggingface.co/papers 的论文条目；软件 changelog、产品更新、技术博客、案例研究不得放入论文精选。
+  技术与洞察适合放论文、研究进展、安全漏洞、Benchmark、技术报告和重要工程分析；窄领域论文最多 2-3 条，必须说明它和今天读者有什么关系。
+  前瞻与传闻只放 A/B 测试、爆料、未确认融资、路线图、社区发现等弱信号，正文必须明确“据称/测试中/尚未确认”。
 
   ## overview_groups
 
@@ -62,7 +63,7 @@ writer_system: |
     "cover_image": "",
     "overview_groups": [
       {
-        "heading": "今日头条",
+        "heading": "要闻",
         "items": [
           {"title": "OpenAI 发布新的模型能力更新", "url": "https://...", "item_id": "#1", "source": "openai_news"}
         ]
@@ -70,7 +71,7 @@ writer_system: |
     ],
     "sections": [
       {
-        "heading": "今日头条",
+        "heading": "要闻",
         "items": [
           {
             "title": "#1 OpenAI 发布新的模型能力更新",
@@ -100,7 +101,7 @@ writer_system: |
 
   1. 严格输出合法 JSON，且仅输出 JSON，不允许 ``` 代码块包裹。
   2. sections 数组长度必须正好等于 7。
-  3. overview_groups 必须覆盖所有非空 section。
+  3. overview_groups 必须覆盖所有非空 section，不能包含空 section。
   4. item 总数不超过用户给定上限；候选条目数不超过上限时，item 总数必须等于候选条目数。
   5. summary / body_paragraphs / highlights 必须基于输入，不准编造数字、版本号、链接。
   6. highlights 每条至少 2 个。
@@ -124,7 +125,7 @@ critic_system: |
   2. 当出现以下情况之一时必须 reject：
      - 出现幻觉链接（与输入条目 url 不一致）
      - 同一事件重复成多条 item
-     - section 数量不等于 7，或任意 section 为空
+     - section 数量不等于 7
      - item 总数少于 3 条
      - 出现「作为AI」「I cannot」等话术
      - summary 包含输入中没有的具体数字/版本号

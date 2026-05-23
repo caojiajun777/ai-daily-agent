@@ -71,19 +71,19 @@
 2. **EventScorer** — 多维度规则评分
 3. **HistoryChecker** — 从已发布 Issue 加载近期标题，去重
 4. **ResearchEditor (LLM)** — deepseek-chat 模型，基于候选事件做出编辑决策（select/reject、priority、section）
-5. **FinalSelector** — section 多样性 + source 多样性 + **论文配额（min 5 篇）** + 回退机制
+5. **FinalSelector** — section 多样性 + source 多样性 + 核心板块软覆盖 + 回退机制
 
 **关键算法：**
 - **时效性衰减**：指数衰减模型，72 小时半衰期
 - **来源多样性惩罚**：同一源第 4 条 ×0.85，第 7 条 ×0.60，防止单源霸榜
 - **AI 相关性保证**：arxiv/hf_daily_papers 自动视为 AI 相关（`_AI_GUARANTEED_SOURCES`）
-- **论文配额**：curator.py 和 final_selector.py 双路径保障 min 5 篇论文
-- **回退机制**：LLM 选条 < 16 时自动按 rule_score 填充差额
+- **技术洞察限量**：论文、研究、安全和 Benchmark 进入“技术与洞察”，不再强制 min 5 篇论文
+- **回退机制**：LLM 选条不足时自动按 rule_score 填充差额，但不强制塞满每个板块
 
 ### 3. LLM 写稿层 (`agent/agents/writer.py`)
 
 - **模型**：deepseek-chat（非推理模型，结构化 JSON 输出稳定）— **禁止使用 v4-pro**
-- **输出格式**：7 个固定内容板块（今日头条/模型前沿/工具与开源/论文精选/产品落地/资本动向/产业风向），Markdown 顶部概览归并为 juya-style 6 组（要闻/模型发布/开发生态/产品应用/行业动态/论文精选）
+- **输出格式**：7 个 Juya-style 内容板块（要闻/模型发布/开发生态/技术与洞察/产品应用/行业动态/前瞻与传闻）；Markdown 顶部概览只展示非空板块
 - **每条条目**：150-350 字深度分析 + 2-4 条要点提炼
 - **容错机制**：
   - Think block 自动剥离
@@ -222,13 +222,13 @@
 |------|--------|
 | 单次采集量 | 200-270 条 |
 | 聚类后事件数 | 80-115 |
-| 策展后数量 | 16-22 条 |
+| 策展后数量 | 14-18 条 |
 | LLM 调用次数 | 3-5 次/天 (editor + writer + semantic dup + repair) |
 | Token 消耗 | ~15,000 input + ~10,000 output |
 | 单次成本 | ~$0.005 |
-| 日报板块 | 7 个内容板块；顶部概览归并为 6 组 |
+| 日报板块 | 7 个 Juya-style 内容板块；顶部概览只展示非空板块 |
 | 信源语言 | 中文 + 英文 |
-| 论文配额 | min 5 篇/day |
+| 论文配额 | 无硬配额，通常 0-3 篇/day |
 
 ### 质量指标
 

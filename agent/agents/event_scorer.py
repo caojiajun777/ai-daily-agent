@@ -130,6 +130,19 @@ def _metadata_boost(evt: EventCluster) -> float:
         boost += 0.03
     if "community" in ctype or "market_commentary" in ctype:
         boost -= 0.04
+    text = f"{evt.canonical_title} {evt.summary} {' '.join(evt.source_names)} {' '.join(evt.source_urls)}".lower()
+    if any(k in text for k in (
+        "deepseek", "qwen", "通义", "千问", "zhipu", "智谱", "glm",
+        "kimi", "moonshot", "豆包", "doubao", "hunyuan", "混元",
+    )):
+        boost += 0.035
+    if any(k in text for k in (
+        "price", "pricing", "discount", "free", "byok", "降价",
+        "定价", "优惠", "免费", "价格",
+    )):
+        boost += 0.04
+    if any(k in text for k in ("rumor", "爆料", "传闻", "网传", "尚未确认", "未获官方确认")):
+        boost -= 0.06
     return boost
 
 

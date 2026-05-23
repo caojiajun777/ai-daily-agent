@@ -108,6 +108,37 @@ def test_valid_editor_output():
     assert len(output.selected) == 1
 
 
+def test_editor_parse_tolerates_rejected_items_without_decision():
+    event = EventCluster(
+        event_id="evt_1", canonical_title="DeepSeek pricing",
+        primary_url="https://api-docs.deepseek.com/pricing",
+        source_urls=["https://api-docs.deepseek.com/pricing"],
+        source_names=["deepseek_pricing"], source_types=["pricing_snapshot"],
+        source_count=1, summary="DeepSeek pricing changed.",
+    )
+    raw = json.dumps({
+        "selected": [{
+            "event_id": "evt_1", "decision": "select",
+            "priority": "must_include", "section": "要闻",
+            "evidence_level": "official", "novelty": "new_event",
+            "reader_utility": "high", "why_it_matters": "pricing matters",
+            "writing_angle": "explain API cost impact", "risk_level": "low",
+            "sources_to_use": ["https://api-docs.deepseek.com/pricing"],
+        }],
+        "rejected": [{
+            "event_id": "evt_1",
+            "reject_reason": "duplicate candidate",
+        }],
+    }, ensure_ascii=False)
+
+    output = _parse_and_validate(raw, [event])
+
+    assert len(output.selected) == 1
+    assert output.selected[0].sources_to_use[0].url == event.primary_url
+    assert len(output.rejected) == 1
+    assert output.rejected[0].decision == "reject"
+
+
 def test_fake_event_id_filtered():
     event = EventCluster(
         event_id="evt_real", canonical_title="Real",
@@ -155,14 +186,14 @@ def test_section_validator_moves_obvious_product_out_of_model_frontier():
     )
     raw = json.dumps({"selected": [{
         "event_id": "evt_product", "decision": "select",
-        "priority": "high", "section": "模型前沿",
+        "priority": "high", "section": "模型发布",
         "evidence_level": "primary", "novelty": "new_event",
         "reader_utility": "high", "why_it_matters": "x",
         "writing_angle": "x", "risk_level": "low",
         "sources_to_use": [{"url": "https://openai.com/index/adventhealth", "role": "primary"}],
     }], "rejected": []})
     output = _parse_and_validate(raw, [event])
-    assert output.selected[0].section == "产品落地"
+    assert output.selected[0].section == "产品应用"
 
 
 def test_section_validator_moves_model_release_out_of_product():
@@ -176,14 +207,14 @@ def test_section_validator_moves_model_release_out_of_product():
     )
     raw = json.dumps({"selected": [{
         "event_id": "evt_qwen", "decision": "select",
-        "priority": "high", "section": "产品落地",
+        "priority": "high", "section": "产品应用",
         "evidence_level": "official", "novelty": "new_event",
         "reader_utility": "high", "why_it_matters": "x",
         "writing_angle": "x", "risk_level": "low",
         "sources_to_use": [{"url": event.primary_url, "role": "primary"}],
     }], "rejected": []})
     output = _parse_and_validate(raw, [event])
-    assert output.selected[0].section == "模型前沿"
+    assert output.selected[0].section == "模型发布"
 
 
 def test_section_validator_moves_open_source_model_out_of_tools():
@@ -197,14 +228,14 @@ def test_section_validator_moves_open_source_model_out_of_tools():
     )
     raw = json.dumps({"selected": [{
         "event_id": "evt_hymt", "decision": "select",
-        "priority": "high", "section": "工具与开源",
+        "priority": "high", "section": "开发生态",
         "evidence_level": "official", "novelty": "new_event",
         "reader_utility": "high", "why_it_matters": "x",
         "writing_angle": "x", "risk_level": "low",
         "sources_to_use": [{"url": event.primary_url, "role": "primary"}],
     }], "rejected": []}, ensure_ascii=False)
     output = _parse_and_validate(raw, [event])
-    assert output.selected[0].section == "模型前沿"
+    assert output.selected[0].section == "模型发布"
 
 
 def test_section_validator_keeps_model_powered_agent_tool_out_of_model_frontier():
@@ -222,14 +253,14 @@ def test_section_validator_keeps_model_powered_agent_tool_out_of_model_frontier(
     )
     raw = json.dumps({"selected": [{
         "event_id": "evt_datasette", "decision": "select",
-        "priority": "high", "section": "模型前沿",
+        "priority": "high", "section": "模型发布",
         "evidence_level": "primary", "novelty": "new_event",
         "reader_utility": "high", "why_it_matters": "x",
         "writing_angle": "x", "risk_level": "low",
         "sources_to_use": [{"url": event.primary_url, "role": "primary"}],
     }], "rejected": []}, ensure_ascii=False)
     output = _parse_and_validate(raw, [event])
-    assert output.selected[0].section == "产业风向"
+    assert output.selected[0].section == "行业动态"
 
 
 def test_final_selector_normalizes_model_release_sections():
@@ -245,14 +276,14 @@ def test_final_selector_normalizes_model_release_sections():
     output = ResearchEditorOutput(selected=[
         EditorialDecision(
             event_id="evt_qwen", decision="select", priority="high",
-            section="产品落地", evidence_level="official", novelty="new_event",
+            section="产品应用", evidence_level="official", novelty="new_event",
             reader_utility="high", why_it_matters="x", writing_angle="x",
             risk_level="low", sources_to_use=[SourceUse(url=event.primary_url)],
         )
     ], rejected=[])
     items, recs, meta = select_final_items(
         editor_output=output, events=[event], min_items=1, max_items=3, min_papers=0)
-    assert items[0].section == "模型前沿"
+    assert items[0].section == "模型发布"
     assert meta["section_normalized_count"] == 1
 
 
@@ -270,15 +301,129 @@ def test_final_selector_normalizes_agent_tool_sections():
     output = ResearchEditorOutput(selected=[
         EditorialDecision(
             event_id="evt_datasette", decision="select", priority="high",
-            section="模型前沿", evidence_level="primary", novelty="new_event",
+            section="模型发布", evidence_level="primary", novelty="new_event",
             reader_utility="high", why_it_matters="x", writing_angle="x",
             risk_level="low", sources_to_use=[SourceUse(url=event.primary_url)],
         )
     ], rejected=[])
     items, recs, meta = select_final_items(
         editor_output=output, events=[event], min_items=1, max_items=3, min_papers=0)
-    assert items[0].section == "产业风向"
+    assert items[0].section == "行业动态"
     assert meta["section_normalized_count"] == 1
+
+
+def test_tier3_financial_story_is_not_automatically_rumor():
+    event = EventCluster(
+        event_id="evt_nvidia",
+        canonical_title="黄仁勋：AI 基建年度开支要冲到 4 万亿美元",
+        primary_url="https://www.ithome.com/0/954/223.htm",
+        source_urls=["https://www.ithome.com/0/954/223.htm"],
+        source_names=["ithome"],
+        source_types=["rss"],
+        source_count=1,
+        primary_source_tier="tier_3_pulse_noise",
+        summary="报道称英伟达 Q1 营收 816 亿美元，黄仁勋预测 AI 基建年度开支将达 4 万亿美元。",
+        rule_score=0.8,
+    )
+    output = ResearchEditorOutput(selected=[
+        EditorialDecision(
+            event_id="evt_nvidia", decision="select", priority="high",
+            section="前瞻与传闻", evidence_level="trusted_media",
+            novelty="new_event", reader_utility="high",
+            why_it_matters="x", writing_angle="x", risk_level="medium",
+            sources_to_use=[SourceUse(url=event.primary_url)],
+        )
+    ], rejected=[])
+    items, _recs, _meta = select_final_items(
+        editor_output=output, events=[event], min_items=1, max_items=3, min_papers=0)
+    assert items[0].section == "行业动态"
+
+
+def test_supporting_links_drop_bare_social_profiles():
+    event = EventCluster(
+        event_id="evt_databricks",
+        canonical_title="Databricks brings GPT-5.5 to enterprise agent workflows",
+        primary_url="https://openai.com/index/databricks",
+        source_urls=[
+            "https://openai.com/index/databricks",
+            "https://x.com/Alibaba_Qwen",
+        ],
+        source_names=["openai_news", "x_qwen"],
+        source_types=["rss", "x_cookie"],
+        source_count=2,
+        summary="Databricks integrates GPT-5.5 for enterprise agent workflows.",
+        rule_score=0.8,
+    )
+    output = ResearchEditorOutput(selected=[
+        EditorialDecision(
+            event_id="evt_databricks", decision="select", priority="high",
+            section="技术与洞察", evidence_level="official",
+            novelty="new_event", reader_utility="high",
+            why_it_matters="x", writing_angle="x", risk_level="low",
+            sources_to_use=[SourceUse(url=event.primary_url)],
+        )
+    ], rejected=[])
+    items, _recs, _meta = select_final_items(
+        editor_output=output, events=[event], min_items=1, max_items=3, min_papers=0)
+    assert "https://x.com/Alibaba_Qwen" not in items[0].supporting_urls
+
+
+def test_official_pricing_change_promotes_to_headline():
+    event = EventCluster(
+        event_id="evt_deepseek_pricing",
+        canonical_title="DeepSeek-V4-Pro API 2.5 折优惠转为永久正式定价",
+        primary_url="https://api-docs.deepseek.com/zh-cn/quick_start/pricing",
+        source_urls=["https://api-docs.deepseek.com/zh-cn/quick_start/pricing"],
+        source_names=["deepseek_pricing"],
+        source_types=["pricing_snapshot"],
+        source_count=1,
+        primary_content_type="china_model_pricing",
+        primary_evidence_type="pricing_page",
+        primary_source_tier="tier_0_core_evidence",
+        summary="官方定价页显示优惠将在 5 月 31 日结束后转为永久正式定价。",
+        rule_score=0.8,
+    )
+    output = ResearchEditorOutput(selected=[
+        EditorialDecision(
+            event_id="evt_deepseek_pricing", decision="select", priority="high",
+            section="开发生态", evidence_level="official",
+            novelty="new_event", reader_utility="high",
+            why_it_matters="x", writing_angle="x", risk_level="low",
+            sources_to_use=[SourceUse(url=event.primary_url)],
+        )
+    ], rejected=[])
+    items, _recs, meta = select_final_items(
+        editor_output=output, events=[event], min_items=1, max_items=3, min_papers=0)
+    assert items[0].section == "要闻"
+    assert meta["section_normalized_count"] == 1
+
+
+def test_tier3_low_confidence_item_cannot_stay_headline():
+    event = EventCluster(
+        event_id="evt_nvidia",
+        canonical_title="黄仁勋：AI 基建年度开支要冲到 4 万亿美元",
+        primary_url="https://www.ithome.com/0/954/223.htm",
+        source_urls=["https://www.ithome.com/0/954/223.htm"],
+        source_names=["ithome"],
+        source_types=["rss"],
+        source_count=1,
+        primary_source_tier="tier_3_pulse_noise",
+        primary_confidence="low",
+        summary="报道称英伟达财报和 AI 基建开支预测。",
+        rule_score=0.8,
+    )
+    output = ResearchEditorOutput(selected=[
+        EditorialDecision(
+            event_id="evt_nvidia", decision="select", priority="must_include",
+            section="要闻", evidence_level="trusted_media",
+            novelty="new_event", reader_utility="high",
+            why_it_matters="x", writing_angle="x", risk_level="medium",
+            sources_to_use=[SourceUse(url=event.primary_url)],
+        )
+    ], rejected=[])
+    items, _recs, _meta = select_final_items(
+        editor_output=output, events=[event], min_items=1, max_items=3, min_papers=0)
+    assert items[0].section == "行业动态"
 
 
 # Final Selector
@@ -301,10 +446,10 @@ def test_selector_backfills_missing_sections_from_all_events():
                      primary_url="https://example.com/head", source_urls=["https://example.com/head"],
                      source_names=["openai"], source_types=["rss"], source_count=1,
                      summary="A product feature launch.", rule_score=0.95),
-        EventCluster(event_id="evt_model", canonical_title="Gemini 4 model benchmark improves coding",
+        EventCluster(event_id="evt_model", canonical_title="Google releases Gemini 4 model for coding agents",
                      primary_url="https://example.com/model", source_urls=["https://example.com/model"],
                      source_names=["google"], source_types=["rss"], source_count=1,
-                     summary="A model benchmark update.", rule_score=0.9),
+                     summary="Google released a new Gemini model with coding and agent benchmark gains.", rule_score=0.9),
         EventCluster(event_id="evt_tool", canonical_title="New GitHub SDK open source tool",
                      primary_url="https://example.com/tool", source_urls=["https://example.com/tool"],
                      source_names=["github"], source_types=["rss"], source_count=1,
@@ -321,7 +466,7 @@ def test_selector_backfills_missing_sections_from_all_events():
     output = ResearchEditorOutput(selected=[
         EditorialDecision(
             event_id="evt_head", decision="select", priority="high",
-            section="今日头条", evidence_level="primary", novelty="new_event",
+            section="要闻", evidence_level="primary", novelty="new_event",
             reader_utility="high", why_it_matters="x", writing_angle="x",
             risk_level="low", sources_to_use=[],
         )
@@ -337,7 +482,7 @@ def test_selector_backfills_missing_sections_from_all_events():
 
     sections = {item.section for item in items}
     assert len(items) >= 5
-    assert {"模型前沿", "工具与开源", "资本动向", "产业风向"} <= sections
+    assert {"模型发布", "开发生态", "行业动态"} <= sections
 
 
 # URL validation — fabricated URLs are dropped with warnings
@@ -405,7 +550,7 @@ def test_full_pipeline_smoke(cfg, prompts, tmp_path):
     import re as _re
 
     # Mock provider: dynamically match event IDs from the user prompt.
-    section_cycle = ["今日头条", "模型前沿", "工具与开源", "论文精选", "产品落地", "业界风向"]
+    section_cycle = ["要闻", "模型发布", "开发生态", "技术与洞察", "产品应用", "行业动态"]
     call_count = [0]
 
     def responder(msgs):
@@ -506,7 +651,7 @@ def test_full_pipeline_smoke(cfg, prompts, tmp_path):
     with open(draft_path, "r", encoding="utf-8") as f:
         md = f.read()
     assert "AI Daily Test" in md
-    assert "今日头条" in md
+    assert "要闻" in md
 
     curated_path = result.get("curated_path")
     assert curated_path and os.path.exists(curated_path), "No curated_path"

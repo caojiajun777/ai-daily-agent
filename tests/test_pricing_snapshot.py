@@ -12,6 +12,7 @@ from agent.schemas import (
     PricingSnapshot,
 )
 from agent.sources.pricing_snapshot import (
+    PricingSnapshotAdapter,
     _compute_content_hash,
     _compute_diff,
     _from_static_config,
@@ -89,6 +90,50 @@ def test_static_config_pricing_snapshot():
     assert diff is not None
     assert diff.previous_date is None
     assert not diff.has_changes
+
+
+def test_featured_pricing_candidate_emits_without_static_candidates():
+    spec = {
+        "id": "deepseek_pricing",
+        "type": "pricing_snapshot",
+        "provider": "deepseek",
+        "source_url": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing",
+        "content_type": "china_model_pricing",
+        "source_tier": "tier_0_core_evidence",
+        "reliability": "high",
+        "evidence_type": "pricing_page",
+        "default_confidence": "high",
+        "featured_candidates": [{
+            "title": "DeepSeek-V4-Pro API 2.5 折优惠转为永久正式定价",
+            "summary": "官方定价页显示优惠转为永久正式定价。",
+            "candidate_until": "2099-01-01",
+        }],
+        "pricing_records": [{
+            "model": "deepseek-v4-pro",
+            "input_price_per_m": 3,
+            "currency": "CNY",
+        }],
+    }
+    adapter = PricingSnapshotAdapter(spec)
+    items = adapter.fetch(max_items=5)
+    assert len(items) == 1
+    assert items[0].title.startswith("DeepSeek-V4-Pro")
+    assert items[0].url.endswith("/pricing")
+    assert items[0].evidence_type == "pricing_page"
+
+
+def test_featured_pricing_candidate_expires():
+    spec = {
+        "id": "old_pricing",
+        "type": "pricing_snapshot",
+        "source_url": "https://example.com/pricing",
+        "featured_candidates": [{
+            "title": "Old pricing news",
+            "candidate_until": "2000-01-01",
+        }],
+    }
+    adapter = PricingSnapshotAdapter(spec)
+    assert adapter.fetch(max_items=5) == []
 
 
 def test_pricing_snapshot_content_hash_stable():

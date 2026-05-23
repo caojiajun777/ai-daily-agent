@@ -139,11 +139,18 @@ def _run_research_editor_flow(
             from agent.tools.evidence_fetcher import fetch_evidence_for_events
             top_events = events[:max(0, evidence_max_events)]
             url_lists = [
-                e.source_urls[:max(1, evidence_urls_per_event)]
+                _evidence_urls_for_event(e, max(1, evidence_urls_per_event))
                 for e in top_events
             ]
+            evidence_t0 = time.time()
+            tracer.log(
+                "evidence_fetch_start",
+                event_count=len(top_events),
+                url_count=sum(len(urls) for urls in url_lists),
+                timeout_sec=evidence_timeout,
+            )
             fetched_evidence = fetch_evidence_for_events(
-                url_lists, timeout=evidence_timeout,
+                url_lists, timeout=evidence_timeout, max_workers=8,
             )
             evidence_list = fetched_evidence + [
                 [] for _ in range(max(0, len(events) - len(fetched_evidence)))
@@ -158,9 +165,16 @@ def _run_research_editor_flow(
             editorial_meta["evidence_fetch_failed"] = sum(
                 1 for evlist in evidence_list for e in evlist if e.fetch_status != "ok"
             )
-        except Exception:
+            tracer.log(
+                "evidence_fetch_done",
+                latency_ms=int((time.time() - evidence_t0) * 1000),
+                ok=editorial_meta["evidence_fetch_success"],
+                failed=editorial_meta["evidence_fetch_failed"],
+            )
+        except Exception as e:
             evidence_list = []
             editorial_meta["evidence_fetch_error"] = "exception"
+            tracer.log("evidence_fetch_error", error=str(e))
     else:
         evidence_list = []
 
@@ -219,20 +233,20 @@ def _balance_candidate_events(events: List[Any], *, limit: int = 70) -> List[Any
         return events
 
     section_minimums = {
-        "模型前沿": 10,
-        "工具与开源": 8,
-        "产品落地": 8,
-        "资本动向": 5,
-        "产业风向": 6,
-        "论文精选": 14,
+        "模型发布": 10,
+        "开发生态": 10,
+        "技术与洞察": 8,
+        "产品应用": 7,
+        "行业动态": 7,
+        "前瞻与传闻": 4,
     }
     section_caps = {
-        "模型前沿": 14,
-        "工具与开源": 12,
-        "产品落地": 12,
-        "资本动向": 8,
-        "产业风向": 8,
-        "论文精选": 18,
+        "模型发布": 14,
+        "开发生态": 14,
+        "技术与洞察": 10,
+        "产品应用": 10,
+        "行业动态": 10,
+        "前瞻与传闻": 5,
     }
     buckets: Dict[str, List[Any]] = {}
     for evt in events:
@@ -303,6 +317,31 @@ def _format_evidence_snippet(snippet: Any) -> str:
     if url:
         parts.append(f"url={url}")
     return " | ".join(parts)
+
+
+def _evidence_urls_for_event(evt: Any, limit: int) -> List[str]:
+    urls: List[str] = []
+    for url in getattr(evt, "source_urls", []) or []:
+        if len(urls) >= limit:
+            break
+        if not isinstance(url, str) or not url.startswith(("http://", "https://")):
+            continue
+        if _is_low_value_evidence_url(url):
+            continue
+        if url not in urls:
+            urls.append(url)
+    return urls
+
+
+def _is_low_value_evidence_url(url: str) -> bool:
+    """Skip pages that rarely yield useful article text in evidence fetch."""
+    from urllib.parse import urlparse
+
+    try:
+        host = urlparse(url).netloc.lower().replace("www.", "")
+    except Exception:
+        return False
+    return host in {"x.com", "twitter.com", "t.co"}
 
 
 def _enrich_images_for_draft(draft, tracer, timeout: float = 4.0) -> int:

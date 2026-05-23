@@ -1,4 +1,4 @@
-"""Deterministic section classifier for the seven-section daily layout."""
+"""Deterministic section classifier for the Juya-style editorial layout."""
 
 from __future__ import annotations
 
@@ -8,40 +8,48 @@ from agent.agents.event_clusterer import EventCluster
 
 
 def guess_section(evt: EventCluster) -> str:
-    """Classify an event into the daily's seven editorial sections."""
-    if _is_paper_event(evt):
-        return "论文精选"
+    """Classify an event into the daily's editorial sections.
 
-    title = (evt.canonical_title or "").lower()
+    The classifier intentionally returns topical sections. "要闻" is a
+    priority bucket and is assigned by the editor/final selector.
+    """
     text = _event_text(evt)
+    title = (evt.canonical_title or "").lower()
 
-    # Capital has the clearest lexical signal and should win over model terms
-    # inside fundraising or earnings stories.
+    if _is_forward_or_rumor(evt, text):
+        return "前瞻与传闻"
+
+    if _is_paper_event(evt):
+        return "技术与洞察"
+
     if _has_any(text, _CAPITAL_TERMS):
-        return "资本动向"
+        return "行业动态"
 
     if _is_tier3_pulse(evt):
-        return "产业风向"
+        return "行业动态"
 
     # Strong model-release signals must run before tool/product matching:
     # open-source models and flagship model launches often contain words like
     # "open source", "launch", or "product", but editorially belong here.
     if _is_model_release(text, title):
-        return "模型前沿"
+        return "模型发布"
+
+    if _has_any(text, _TECH_INSIGHT_TERMS):
+        return "技术与洞察"
 
     if _has_any(text, _INDUSTRY_TERMS):
-        return "产业风向"
+        return "行业动态"
 
     if _has_any(text, _TOOL_TERMS):
-        return "工具与开源"
+        return "开发生态"
 
     if _has_any(text, _PRODUCT_TERMS):
-        return "产品落地"
+        return "产品应用"
 
     if _is_model_topic(text):
-        return "模型前沿"
+        return "模型发布"
 
-    return "产业风向"
+    return "行业动态"
 
 
 def _is_paper_event(evt: EventCluster) -> bool:
@@ -68,6 +76,20 @@ def _is_tier3_pulse(evt: EventCluster) -> bool:
         "tier_3" in (evt.primary_source_tier or "").lower()
         and not _is_official_release_source(evt)
     )
+
+
+def _is_forward_or_rumor(evt: EventCluster, text: str) -> bool:
+    if _has_any(text, _RUMOR_TERMS):
+        return True
+    ctype = (evt.primary_content_type or "").lower()
+    etype = (evt.primary_evidence_type or "").lower()
+    confidence = (evt.primary_confidence or "").lower()
+    if confidence == "low" and _has_any(text, _LOW_CONFIDENCE_RUMOR_TERMS):
+        return True
+    return any(k in ctype or k in etype for k in (
+        "rumor", "leak", "insider_reporter_signal", "vc_signal",
+        "community_signal", "market_commentary",
+    ))
 
 
 def _is_official_release_source(evt: EventCluster) -> bool:
@@ -168,12 +190,34 @@ _CAPITAL_TERMS = (
     "series", "轮融资",
 )
 
+_RUMOR_TERMS = (
+    "rumor", "rumour", "leak", "leaked", "testing", "a/b test",
+    "ab test", "spotted", "prototype", "previewed", "unconfirmed",
+    "传闻", "爆料", "泄露", "测试", "小规模测试", "内测", "灰度",
+    "据称", "消息称", "网传", "尚未确认", "未获官方确认",
+    "或将", "前瞻",
+)
+
+_LOW_CONFIDENCE_RUMOR_TERMS = (
+    "融资", "funding", "估值", "valuation", "参投", "接近",
+    "可能", "计划", "raise", "raising",
+)
+
+_TECH_INSIGHT_TERMS = (
+    "research", "paper", "arxiv", "benchmark", "eval", "evaluation",
+    "security", "vulnerability", "vulnerabilities", "proof", "theorem",
+    "formal", "lean", "architecture", "training method", "post-training",
+    "reasoning", "alignment", "safety", "whitepaper", "technical report",
+    "研究", "论文", "基准", "评估", "安全", "漏洞", "证明", "定理",
+    "形式化", "架构", "训练方法", "后训练", "推理", "对齐", "技术报告",
+)
+
 _INDUSTRY_TERMS = (
     "政策", "监管", "regulation", "law", "ban", "hire", "ceo",
     "executive", "partner", "partners", "partnership", "provider",
     "providers", "service provider", "hardware partner", "合作", "裁员", "layoff",
     "人事", "任命", "趋势", "trend", "预测", "outlook", "government",
-    "citizen", "national", "全民", "战略", "strategy",
+    "citizen", "national", "全民", "战略", "strategy", "算力", "芯片",
 )
 
 _TOOL_TERMS = (

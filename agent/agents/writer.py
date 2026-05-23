@@ -202,9 +202,20 @@ def write_draft(
 
 
 _SECTION_ORDER = [
-    "今日头条", "模型前沿", "工具与开源", "论文精选",
-    "产品落地", "资本动向", "产业风向",
+    "要闻", "模型发布", "开发生态", "技术与洞察",
+    "产品应用", "行业动态", "前瞻与传闻",
 ]
+
+_SECTION_ALIASES = {
+    "今日头条": "要闻",
+    "模型前沿": "模型发布",
+    "工具与开源": "开发生态",
+    "论文精选": "技术与洞察",
+    "产品落地": "产品应用",
+    "资本动向": "行业动态",
+    "产业风向": "行业动态",
+    "业界风向": "行业动态",
+}
 
 
 def _fallback_draft_from_items(
@@ -275,7 +286,7 @@ def _complete_draft_with_items(
     kept = 0
 
     for section in draft.sections:
-        heading = section.heading if section.heading in buckets else "产业风向"
+        heading = _normalize_section_heading(section.heading)
         for item in section.items:
             if kept >= max_items:
                 break
@@ -375,20 +386,11 @@ def _renumber_sections(buckets: Dict[str, List[DraftItem]]) -> List[DraftSection
 
 
 def _overview_groups_from_sections(sections: List[DraftSection]) -> List[OverviewGroup]:
-    _GROUP_MAP = {
-        "今日头条": "要闻",
-        "模型前沿": "模型发布",
-        "工具与开源": "开发生态",
-        "产品落地": "产品应用",
-        "资本动向": "行业动态",
-        "产业风向": "行业动态",
-        "论文精选": "论文精选",
-    }
     groups: Dict[str, List[OverviewEntry]] = {}
     for section in sections:
         if not section.items:
             continue
-        group_name = _GROUP_MAP.get(section.heading, section.heading)
+        group_name = _normalize_section_heading(section.heading)
         if group_name not in groups:
             groups[group_name] = []
         for idx, item in enumerate(section.items):
@@ -399,12 +401,11 @@ def _overview_groups_from_sections(sections: List[DraftSection]) -> List[Overvie
                 source=item.source,
             ))
     result = []
-    _known = {"要闻", "模型发布", "开发生态", "产品应用", "行业动态", "论文精选"}
-    for heading in _known:
+    for heading in _SECTION_ORDER:
         if heading in groups and groups[heading]:
             result.append(OverviewGroup(heading=heading, items=groups[heading]))
     for heading, items in groups.items():
-        if heading not in _known:
+        if heading not in _SECTION_ORDER:
             result.append(OverviewGroup(heading=heading, items=items))
     return result
 
@@ -413,21 +414,30 @@ def _title_key(title: str) -> str:
     return _re_mod.sub(r"\W+", "", _strip_item_number(title or "").lower())
 
 
+def _normalize_section_heading(section: str) -> str:
+    mapped = _SECTION_ALIASES.get(section or "", section or "")
+    return mapped if mapped in _SECTION_ORDER else "行业动态"
+
+
 def _section_for_curated(item: CuratedItem) -> str:
-    if item.section in _SECTION_ORDER:
-        return item.section
+    if item.section:
+        normalized = _normalize_section_heading(item.section)
+        if normalized in _SECTION_ORDER:
+            return normalized
     text = f"{item.section_hint} {item.content_type} {item.evidence_type} {item.title}".lower()
     if "paper" in text or "arxiv" in item.url or "huggingface.co/papers" in item.url:
-        return "论文精选"
+        return "技术与洞察"
+    if any(k in text for k in ("rumor", "leak", "testing", "爆料", "传闻", "测试", "尚未确认")):
+        return "前瞻与传闻"
     if any(k in text for k in ("pricing", "github", "sdk", "api", "tool", "开源", "changelog")):
-        return "工具与开源"
+        return "开发生态"
     if any(k in text for k in ("funding", "earnings", "revenue", "ipo", "acquisition", "融资", "财报", "收购")):
-        return "资本动向"
+        return "行业动态"
     if any(k in text for k in ("product", "launch", "feature", "产品", "上线")):
-        return "产品落地"
+        return "产品应用"
     if any(k in text for k in ("model", "benchmark", "模型", "推理")):
-        return "模型前沿"
-    return "产业风向"
+        return "模型发布"
+    return "行业动态"
 
 
 def _fallback_paragraphs(item: CuratedItem) -> List[str]:
@@ -443,8 +453,8 @@ def _fallback_paragraphs(item: CuratedItem) -> List[str]:
             parts.append(f"据{_source_label(item.source)}报道，{title}。")
         else:
             parts.append(f"报道称{title}。")
-        if item.evidence_type == "paper":
-            parts.append(f"该研究已发布在arXiv上，具体技术细节请参考原文。")
+        if item.evidence_type == "paper" or "arxiv.org" in item.url:
+            parts.append("这条更适合当作技术趋势信号看，关键是方法、数据和可复现线索。")
         elif item.content_type == "insider_media":
             parts.append(f"该消息来自{_source_label(item.source)}，建议查阅原文获取完整信息。")
         if parts:
@@ -452,7 +462,7 @@ def _fallback_paragraphs(item: CuratedItem) -> List[str]:
     if item.why_it_matters:
         paragraphs.append(item.why_it_matters)
     if item.writing_angle and item.writing_angle not in paragraphs[-1:]:
-        paragraphs.append(f"编辑视角：{item.writing_angle}")
+        paragraphs.append(item.writing_angle)
     # Deduplicate: avoid exact repeats of title in paragraphs.
     title_clean = _strip_item_number(item.title).strip()
     paragraphs = [p for p in paragraphs if p.strip() != title_clean]
@@ -492,6 +502,8 @@ def _item_type_for_curated(item: CuratedItem) -> str:
 
 
 def _rumor_level_for_curated(item: CuratedItem) -> str:
+    if _section_for_curated(item) == "前瞻与传闻":
+        return "rumor" if item.confidence == "low" else "reported"
     if item.confidence == "high" or "tier_0" in item.source_tier:
         return "confirmed"
     if "insider" in item.content_type or "report" in item.evidence_type:
@@ -502,14 +514,19 @@ def _rumor_level_for_curated(item: CuratedItem) -> str:
 
 
 def _evidence_note_for_curated(item: CuratedItem) -> str:
-    parts = []
-    if item.source_tier:
-        parts.append(item.source_tier)
-    if item.evidence_type:
-        parts.append(item.evidence_type)
+    if item.evidence_type in ("official_release", "official_docs"):
+        return "官方发布或文档可核验"
+    if item.evidence_type == "pricing_page":
+        return "官方定价页或价格快照"
+    if item.evidence_type in ("paper", "research_paper") or "arxiv.org" in item.url:
+        return "论文或技术报告"
+    if item.confidence == "low" or _section_for_curated(item) == "前瞻与传闻":
+        return "未完全确认，按传闻/测试线索处理"
+    if "tier_1" in item.source_tier:
+        return "可信媒体或高信号来源报道"
     if item.reliability:
-        parts.append(f"reliability={item.reliability}")
-    return " / ".join(parts)
+        return f"来源可靠性：{item.reliability}"
+    return ""
 
 
 # ── Juya-style Markdown rendering ─────────────────────────────────────
@@ -621,13 +638,14 @@ def _flatten_items(draft: Draft) -> List[tuple[str, DraftItem]]:
 def _normalize_overview_groups(groups: List[OverviewGroup]) -> List[OverviewGroup]:
     """Map section-heading groups to juya-style news-type groups, merging duplicates."""
     _GROUP_MAP = {
-        "今日头条": "要闻", "Headlines": "要闻",
-        "模型前沿": "模型发布", "Model Frontier": "模型发布",
-        "工具与开源": "开发生态", "Tools & Open Source": "开发生态",
-        "论文精选": "论文精选", "Paper Picks": "论文精选",
-        "产品落地": "产品应用", "Launchpad": "产品应用",
-        "资本动向": "行业动态", "Capital Moves": "行业动态",
-        "产业风向": "行业动态", "Industry Watch": "行业动态",
+        **_SECTION_ALIASES,
+        "Headlines": "要闻",
+        "Model Frontier": "模型发布",
+        "Tools & Open Source": "开发生态",
+        "Paper Picks": "技术与洞察",
+        "Launchpad": "产品应用",
+        "Capital Moves": "行业动态",
+        "Industry Watch": "行业动态",
     }
     merged: Dict[str, List[OverviewEntry]] = {}
     for group in groups:
@@ -635,7 +653,7 @@ def _normalize_overview_groups(groups: List[OverviewGroup]) -> List[OverviewGrou
         if mapped not in merged:
             merged[mapped] = []
         merged[mapped].extend(group.items)
-    display_order = ["要闻", "模型发布", "开发生态", "产品应用", "行业动态", "论文精选"]
+    display_order = _SECTION_ORDER
     result = []
     for heading in display_order:
         if heading in merged and merged[heading]:
@@ -648,19 +666,10 @@ def _normalize_overview_groups(groups: List[OverviewGroup]) -> List[OverviewGrou
 
 def _auto_overview_groups(draft: Draft):
     """Build juya-style overview groups by news type, not section."""
-    _GROUP_MAP = {
-        "今日头条": "要闻",
-        "模型前沿": "模型发布",
-        "工具与开源": "开发生态",
-        "产品落地": "产品应用",
-        "资本动向": "行业动态",
-        "产业风向": "行业动态",
-        "论文精选": "论文精选",
-    }
     groups: Dict[str, List[OverviewEntry]] = {}
     seq = 1
     for section in draft.sections:
-        group_name = _GROUP_MAP.get(section.heading, section.heading)
+        group_name = _normalize_section_heading(section.heading)
         if group_name not in groups:
             groups[group_name] = []
         for item in section.items:
@@ -674,7 +683,7 @@ def _auto_overview_groups(draft: Draft):
             seq += 1
     result = []
     # Known group headings in display order; unknown ones appended after.
-    display_order = ["要闻", "模型发布", "开发生态", "产品应用", "行业动态", "论文精选"]
+    display_order = _SECTION_ORDER
     for heading in display_order:
         if heading in groups and groups[heading]:
             result.append(OverviewGroup(heading=heading, items=groups[heading]))
@@ -750,13 +759,13 @@ def _dedupe(values: List[str]) -> List[str]:
 
 
 _SECTION_SUBTITLES: Dict[str, str] = {
-    "今日头条": "Headlines",
-    "模型前沿": "Model Frontier",
-    "工具与开源": "Tools & Open Source",
-    "论文精选": "Paper Picks",
-    "产品落地": "Launchpad",
-    "资本动向": "Capital Moves",
-    "产业风向": "Industry Watch",
+    "要闻": "Headlines",
+    "模型发布": "Model Releases",
+    "开发生态": "Developer Ecosystem",
+    "技术与洞察": "Technical Insight",
+    "产品应用": "Product Applications",
+    "行业动态": "Industry Watch",
+    "前瞻与传闻": "Forward Signals",
 }
 
 

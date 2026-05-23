@@ -41,13 +41,14 @@ class PricingSnapshotAdapter:
         self.source_id = spec.get("id", "pricing_snapshot")
 
     def fetch(self, *, max_items: int = 20) -> List[RawItem]:
+        featured = _featured_pricing_candidates(self.spec, self.source_id)
         if not self.spec.get("emit_static_candidates", False):
-            return []
+            return featured[:max_items]
 
         now_ts = datetime.now(timezone.utc).isoformat()
         source_url = self.spec.get("source_url") or self.spec.get("url", "")
         provider = self.spec.get("provider", self.source_id)
-        items: List[RawItem] = []
+        items: List[RawItem] = list(featured)
         for rec in (self.spec.get("pricing_records") or [])[:max_items]:
             if not isinstance(rec, dict):
                 continue
@@ -70,8 +71,49 @@ class PricingSnapshotAdapter:
                 summary=summary,
                 published_at=now_ts,
                 content_type=self.spec.get("content_type", "pricing_page"),
+                source_tier=self.spec.get("source_tier", ""),
+                reliability=self.spec.get("reliability", ""),
+                evidence_type=self.spec.get("evidence_type", "pricing_page"),
+                confidence=self.spec.get("default_confidence", "high"),
+                section_hint=self.spec.get("section_hint", "Cost, Pricing & Access"),
             ))
         return items
+
+
+def _featured_pricing_candidates(spec: Dict[str, Any], source_id: str) -> List[RawItem]:
+    now = datetime.now(timezone.utc)
+    source_url = spec.get("source_url") or spec.get("url", "")
+    items: List[RawItem] = []
+    for event in spec.get("featured_candidates", []) or []:
+        if not isinstance(event, dict):
+            continue
+        until = str(event.get("candidate_until", "")).strip()
+        if until:
+            try:
+                if now.date().isoformat() > until[:10]:
+                    continue
+            except Exception:
+                pass
+        title = str(event.get("title", "")).strip()
+        if not title:
+            continue
+        items.append(RawItem(
+            source_id=source_id,
+            source_type=PricingSnapshotAdapter.type_name,
+            title=title,
+            url=str(event.get("url") or source_url),
+            summary=str(event.get("summary", "")).strip(),
+            published_at=str(event.get("published_at") or now.isoformat()),
+            author=str(event.get("author", "")),
+            tags=list(event.get("tags", [])) if isinstance(event.get("tags", []), list) else [],
+            content_type=str(event.get("content_type") or spec.get("content_type", "pricing_page")),
+            source_tier=str(event.get("source_tier") or spec.get("source_tier", "")),
+            reliability=str(event.get("reliability") or spec.get("reliability", "")),
+            evidence_type=str(event.get("evidence_type") or spec.get("evidence_type", "pricing_page")),
+            confidence=str(event.get("confidence") or spec.get("default_confidence", "high")),
+            section_hint=str(event.get("section_hint") or spec.get("section_hint", "Cost, Pricing & Access")),
+        ))
+    return items
 
 
 def _compute_content_hash(raw_text: str) -> str:

@@ -526,14 +526,14 @@ def curate_with_records(
 
     scored.sort(key=lambda x: x[0], reverse=True)
     top = _select_with_paper_quota(
-        scored, max_items, min_papers=5, research_min=research_min,
+        scored, max_items, min_papers=_MIN_PAPERS, research_min=research_min,
     )
     writer_items = [c for _, c, _ in top]
     records = [rec for _, _, rec in top]
     return writer_items, records
 
 
-_MIN_PAPERS = 5
+_MIN_PAPERS = 0
 _RESEARCH_FLOOR = 0.15  # minimum score for backfilled research papers
 
 
@@ -551,7 +551,7 @@ def _select_with_paper_quota(
     min_papers: int = 5,
     research_min: int = 0,
 ) -> List[Tuple[float, CuratedItem, CuratedItemRecord]]:
-    """Select top-N items, ensuring min_papers arxiv/HF papers.
+    """Select top-N items, optionally ensuring arxiv/HF papers.
 
     If research_min > 0, also ensure at least research_min research_paper
     items with score >= _RESEARCH_FLOOR are in the final set.

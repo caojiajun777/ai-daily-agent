@@ -7,6 +7,7 @@ each URL. Provides source_type hints. Never blocks — all failures are silent.
 from __future__ import annotations
 
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
@@ -84,9 +85,33 @@ def fetch_evidence(
 def fetch_evidence_for_events(
     event_urls_list: List[List[str]],
     timeout: float = 8.0,
+    max_workers: int = 8,
 ) -> List[List[EvidenceSnippet]]:
     """Fetch evidence for multiple events. Returns one list per event."""
-    return [fetch_evidence(urls, timeout) for urls in event_urls_list]
+    if not event_urls_list:
+        return []
+
+    results: List[List[EvidenceSnippet]] = [[] for _ in event_urls_list]
+    workers = max(1, min(int(max_workers), len(event_urls_list)))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        future_to_idx = {
+            pool.submit(fetch_evidence, urls, timeout): idx
+            for idx, urls in enumerate(event_urls_list)
+        }
+        for future in as_completed(future_to_idx):
+            idx = future_to_idx[future]
+            try:
+                results[idx] = future.result()
+            except Exception:
+                results[idx] = [
+                    EvidenceSnippet(
+                        url=url,
+                        fetch_status="failed",
+                        evidence_type=_guess_evidence_type(url),
+                    )
+                    for url in event_urls_list[idx]
+                ]
+    return results
 
 
 def _fetch_one(url: str, timeout: float) -> EvidenceSnippet:
