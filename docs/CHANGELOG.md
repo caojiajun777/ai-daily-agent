@@ -1,5 +1,30 @@
 # Changelog
 
+## v2.8 (2026-05-24) — 历史去重链路加固
+
+### 问题
+v2.7 修复后继续审查发现，历史去重仍有几个真实运行风险：
+- 仓库里跟踪了旧的 `artifacts/drafts` 样例文件。CI clean checkout 时本地 artifacts 不为空，`load_recent_titles` 会提前返回，导致不再读取最近 GitHub issue 正文。
+- LLM reranker 会在规则评分后重算 `rule_score`，可能把已被历史命中的旧事件重新抬高到候选前排。
+- reranker prompt 要求判断发布时间和 URL，但候选输入没有传 `published_at/latest_seen_at`、URL、证据类型和 `already_reported` 标记。
+- ResearchEditor 看到的历史列表混有 issue 标题、URL 和组合项，噪声偏大。
+- 历史加载失败时 pipeline 静默 `pass`，线上很难发现去重退化。
+
+### 修复
+
+| # | 改动 | 文件 | 效果 |
+|---|------|------|------|
+| 35 | 新增 `load_recent_history`，本地 recent artifacts 与 GitHub issue 正文合并；本地 draft 按运行日期和 `window_days` 过滤，不再被旧样例截胡 | `history_checker.py` | CI 能稳定读取最近已发布日报正文 |
+| 36 | `daily_report` 记录 `history_source/history_entry_count/history_error`，并写入 trace | `daily_report.py` | 历史加载失效可观测 |
+| 37 | reranker 候选输入补充 `published_at`、`source_urls`、`evidence_type`、`confidence`、`already_reported` | `llm_reranker.py` | LLM 新鲜度和可靠性判断有依据 |
+| 38 | reranker 对 `already_reported=true` 且无实质后续的事件强制封顶到 0.24 | `llm_reranker.py` | 旧闻不会在二次评分后重新浮上来 |
+| 39 | ResearchEditor 历史上下文过滤 issue 标题和裸 URL，只保留去重后的事件标题 | `research_editor.py` | 编辑 agent 看到的历史更像“已报道事件列表” |
+
+### 验证
+- 本地编译：`python -m compileall agent -q`
+- 定向测试：`python -m pytest tests/test_research_editor.py tests/test_llm_reranker.py tests/test_writer_output_schema.py -q`
+- 全量测试：`python -m pytest -q`
+
 ## v2.7 (2026-05-24) — 编辑新鲜度与阅读体验优化
 
 ### 问题

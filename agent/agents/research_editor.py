@@ -185,9 +185,9 @@ def run_research_editor(
     # History context.
     hist_text = ""
     if history_titles:
-        hist_text = "最近 7 天已报道：\n" + "\n".join(
-            f"- {t[:100]}" for t in history_titles[:30]
-        ) + "\n\n"
+        history_lines = _history_context_lines(history_titles, limit=35)
+        if history_lines:
+            hist_text = "最近 7 天已报道：\n" + "\n".join(history_lines) + "\n\n"
 
     user_msg = (
         f"{hist_text}"
@@ -265,6 +265,30 @@ def _candidate_evidence_lines(evt: EventCluster, evlist: List[Any]) -> List[str]
             lines.append(" | ".join(parts))
     elif evt.evidence_snippets:
         lines.extend(evt.evidence_snippets[:2])
+    return lines
+
+
+def _history_context_lines(history_titles: List[str], limit: int = 35) -> List[str]:
+    """Keep history context event-like for the editor, not a dump of URLs."""
+    lines: List[str] = []
+    seen = set()
+    for raw in history_titles:
+        entry = " ".join(str(raw or "").split())
+        if not entry or entry.startswith("AI 日报"):
+            continue
+        if entry.startswith(("http://", "https://")):
+            continue
+        title = _re.split(r"\s+https?://", entry, maxsplit=1)[0].strip()
+        title = _re.sub(r"^\s*#?\d+[\s.、:-]*", "", title).strip()
+        if not title or title.startswith(("原文", "参考")):
+            continue
+        key = _re.sub(r"[^\w一-鿿]", "", title.lower())
+        if len(key) < 6 or key in seen:
+            continue
+        seen.add(key)
+        lines.append(f"- {title[:110]}")
+        if len(lines) >= limit:
+            break
     return lines
 
 

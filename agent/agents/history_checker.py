@@ -8,8 +8,9 @@ from __future__ import annotations
 import json
 import os
 import re
+from datetime import date, datetime, timedelta, timezone
 from difflib import SequenceMatcher
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 def load_recent_titles(
@@ -19,6 +20,23 @@ def load_recent_titles(
     token: str = "",
     exclude_date: str = "",
 ) -> List[str]:
+    entries, _meta = load_recent_history(
+        artifacts_dir=artifacts_dir,
+        window_days=window_days,
+        repo=repo,
+        token=token,
+        exclude_date=exclude_date,
+    )
+    return entries
+
+
+def load_recent_history(
+    artifacts_dir: str = "artifacts",
+    window_days: int = 7,
+    repo: str = "",
+    token: str = "",
+    exclude_date: str = "",
+) -> Tuple[List[str], Dict[str, Any]]:
     """Load recent published item titles/URLs. Best-effort, never raises.
 
     GitHub Actions runs do not retain yesterday's local artifacts by default,
@@ -27,53 +45,69 @@ def load_recent_titles(
     both item titles and source URLs; downstream scorers can use either signal.
     """
     titles: List[str] = []
+    meta: Dict[str, Any] = {
+        "history_source": "none",
+        "history_entry_count": 0,
+        "history_local_entry_count": 0,
+        "history_github_entry_count": 0,
+    }
+    errors: List[str] = []
+    ref_date = _reference_date(exclude_date)
 
     # 1. Try local artifacts/drafts.
-    drafts_dir = os.path.join(artifacts_dir, "drafts")
-    if os.path.isdir(drafts_dir):
-        for fname in sorted(os.listdir(drafts_dir), reverse=True):
-            if not fname.endswith(".json"):
-                continue
-            if exclude_date and fname.startswith(exclude_date):
-                continue
-            try:
-                path = os.path.join(drafts_dir, fname)
-                with open(path, "r", encoding="utf-8") as f:
-                    draft = json.load(f)
-                title = draft.get("title", "")
-                if title:
-                    titles.append(title)
-                for sec in draft.get("sections", []):
-                    for item in sec.get("items", []):
-                        t = item.get("title", "")
-                        if t:
-                            titles.append(t)
-                        u = item.get("url", "")
-                        if u:
-                            titles.append(u)
-            except Exception:
-                pass
-        if titles:
-            return titles[:200]
+    try:
+        local_entries = _load_local_draft_entries(
+            artifacts_dir=artifacts_dir,
+            window_days=window_days,
+            reference_date=ref_date,
+            exclude_date=exclude_date,
+        )
+        titles.extend(local_entries)
+        meta["history_local_entry_count"] = len(local_entries)
+    except Exception as e:
+        errors.append(f"local:{type(e).__name__}")
 
-    # 2. Fallback: try GitHub Issues API.
+    # 2. Also try GitHub Issues API. Do not skip this when local artifacts
+    # exist: the repo contains a few old sample artifacts, while the latest
+    # published history lives in issue bodies during CI runs.
     if repo and token:
         try:
-            import httpx
             headers = {
                 "Authorization": f"Bearer {token}",
                 "Accept": "application/vnd.github.v3+json",
                 "User-Agent": "report-agent-history",
             }
-            issues = _fetch_recent_issues(repo, headers, window_days, exclude_date=exclude_date)
+            issues = _fetch_recent_issues(
+                repo, headers, window_days,
+                exclude_date=exclude_date,
+                reference_date=ref_date,
+            )
             if not issues:
-                issues = _fetch_recent_issues(repo, headers, window_days, labels="", exclude_date=exclude_date)
+                issues = _fetch_recent_issues(
+                    repo, headers, window_days,
+                    labels="",
+                    exclude_date=exclude_date,
+                    reference_date=ref_date,
+                )
+            github_entries: List[str] = []
             for issue in issues:
-                titles.extend(_extract_issue_history_entries(issue))
-        except Exception:
-            pass
+                github_entries.extend(_extract_issue_history_entries(issue))
+            titles.extend(github_entries)
+            meta["history_github_entry_count"] = len(github_entries)
+        except Exception as e:
+            errors.append(f"github:{type(e).__name__}")
 
-    return _dedupe_keep_order(titles)[:300]
+    entries = _dedupe_keep_order(titles)[:300]
+    sources = []
+    if meta["history_local_entry_count"]:
+        sources.append("local")
+    if meta["history_github_entry_count"]:
+        sources.append("github")
+    meta["history_source"] = "+".join(sources) if sources else "none"
+    meta["history_entry_count"] = len(entries)
+    if errors:
+        meta["history_errors"] = errors
+    return entries, meta
 
 
 def check_already_reported(
@@ -119,9 +153,9 @@ def _fetch_recent_issues(
     *,
     labels: str = "agent-generated",
     exclude_date: str = "",
+    reference_date: Optional[date] = None,
 ) -> List[dict]:
     import httpx
-    from datetime import datetime, timedelta, timezone
 
     params = {
         "state": "all",
@@ -139,19 +173,26 @@ def _fetch_recent_issues(
     )
     if r.status_code != 200:
         return []
-    cutoff = datetime.now(timezone.utc) - timedelta(days=max(1, window_days))
+    ref_date = reference_date or _reference_date(exclude_date)
+    cutoff = ref_date - timedelta(days=max(1, window_days))
     out = []
     for issue in r.json():
         if "pull_request" in issue:
             continue
-        created = issue.get("created_at") or ""
-        try:
-            created_dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
-            if created_dt < cutoff:
-                continue
-        except Exception:
-            pass
         title = issue.get("title", "")
+        issue_date = _date_from_text(title)
+        if issue_date:
+            if not _within_history_window(issue_date, ref_date, window_days, exclude_date):
+                continue
+        else:
+            created = issue.get("created_at") or ""
+            try:
+                created_dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
+                created_date = created_dt.astimezone(timezone.utc).date()
+                if created_date < cutoff or created_date >= ref_date:
+                    continue
+            except Exception:
+                pass
         if exclude_date and exclude_date in title:
             continue
         if title.startswith("AI 日报") or "AI 日报" in title:
@@ -200,3 +241,71 @@ def _dedupe_keep_order(values: List[str]) -> List[str]:
         seen.add(value)
         out.append(value)
     return out
+
+
+def _load_local_draft_entries(
+    *,
+    artifacts_dir: str,
+    window_days: int,
+    reference_date: date,
+    exclude_date: str,
+) -> List[str]:
+    drafts_dir = os.path.join(artifacts_dir, "drafts")
+    if not os.path.isdir(drafts_dir):
+        return []
+    entries: List[str] = []
+    for fname in sorted(os.listdir(drafts_dir), reverse=True):
+        if not fname.endswith(".json"):
+            continue
+        if exclude_date and fname.startswith(exclude_date):
+            continue
+        path = os.path.join(drafts_dir, fname)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                draft = json.load(f)
+        except Exception:
+            continue
+        draft_date = _date_from_text(fname) or _date_from_text(str(draft.get("date", "")))
+        if not _within_history_window(draft_date, reference_date, window_days, exclude_date):
+            continue
+        title = draft.get("title", "")
+        if title:
+            entries.append(title)
+        for sec in draft.get("sections", []):
+            for item in sec.get("items", []):
+                t = item.get("title", "")
+                if t:
+                    entries.append(t)
+                u = item.get("url", "")
+                if u:
+                    entries.append(u)
+    return entries
+
+
+def _reference_date(exclude_date: str = "") -> date:
+    return _date_from_text(exclude_date) or datetime.now(timezone.utc).date()
+
+
+def _date_from_text(text: str) -> Optional[date]:
+    m = re.search(r"(\d{4})-(\d{2})-(\d{2})", text or "")
+    if not m:
+        return None
+    try:
+        return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    except Exception:
+        return None
+
+
+def _within_history_window(
+    item_date: Optional[date],
+    reference_date: date,
+    window_days: int,
+    exclude_date: str,
+) -> bool:
+    if item_date is None:
+        return False
+    excluded = _date_from_text(exclude_date)
+    if excluded and item_date == excluded:
+        return False
+    cutoff = reference_date - timedelta(days=max(1, window_days))
+    return cutoff <= item_date < reference_date

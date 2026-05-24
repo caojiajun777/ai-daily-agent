@@ -11,7 +11,8 @@ from agent.agents.research_editor import (
 )
 from agent.agents.final_selector import select_final_items
 from agent.agents.final_selector import _story_key
-from agent.agents.history_checker import _extract_issue_history_entries
+from agent.agents import history_checker
+from agent.agents.history_checker import _extract_issue_history_entries, load_recent_history
 from agent.agents.section_classifier import guess_section
 from agent.sources.base import RawItem
 
@@ -353,6 +354,56 @@ def test_history_checker_extracts_item_titles_and_urls_from_issue_body():
     assert "DeepSeek-V4-Pro API 永久降价" in entries
     assert "https://api-docs.deepseek.com/zh-cn/quick_start/pricing" in entries
     assert "Google I/O 2026 发布 Gemini 3.5 与 Antigravity 2.0" in entries
+
+
+def test_history_loader_filters_stale_local_artifacts_and_merges_github(tmp_path, monkeypatch):
+    drafts = tmp_path / "drafts"
+    drafts.mkdir()
+    (drafts / "2026-05-10.json").write_text(
+        json.dumps({
+            "date": "2026-05-10",
+            "title": "AI 日报 | 2026-05-10",
+            "sections": [{"items": [
+                {"title": "旧样例条目", "url": "https://example.com/old"}
+            ]}],
+        }, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    (drafts / "2026-05-23.json").write_text(
+        json.dumps({
+            "date": "2026-05-23",
+            "title": "AI 日报 | 2026-05-23",
+            "sections": [{"items": [
+                {"title": "昨日新条目", "url": "https://example.com/local"}
+            ]}],
+        }, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    def fake_fetch(repo, headers, window_days, *, labels="agent-generated",
+                   exclude_date="", reference_date=None):
+        assert reference_date.isoformat() == "2026-05-24"
+        return [{
+            "title": "AI 日报 2026-05-22",
+            "body": "- [#1 GitHub 正文条目](https://example.com/github)",
+        }]
+
+    monkeypatch.setattr(history_checker, "_fetch_recent_issues", fake_fetch)
+
+    entries, meta = load_recent_history(
+        artifacts_dir=str(tmp_path),
+        window_days=7,
+        repo="owner/repo",
+        token="token",
+        exclude_date="2026-05-24",
+    )
+
+    assert "昨日新条目" in entries
+    assert "https://example.com/local" in entries
+    assert "GitHub 正文条目" in entries
+    assert "旧样例条目" not in entries
+    assert meta["history_source"] == "local+github"
+    assert meta["history_entry_count"] == len(entries)
 
 
 def test_history_overlap_marks_repeated_event_and_demotes_score():

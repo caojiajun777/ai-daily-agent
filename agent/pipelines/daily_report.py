@@ -27,7 +27,7 @@ from agent.agents.event_clusterer import cluster_items as cluster_events
 from agent.agents.event_scorer import score_events as score_events_rules
 from agent.agents.research_editor import run_research_editor
 from agent.agents.final_selector import select_final_items, _guess_section, _story_key
-from agent.agents.history_checker import load_recent_titles
+from agent.agents.history_checker import load_recent_history
 from agent.agents.publisher import publish_local
 from agent.agents.repairer import repair_draft, RepairerFailed
 from agent.agents.semantic_duplicate_critic import (
@@ -88,14 +88,21 @@ def _run_research_editor_flow(
     try:
         repo = _os.getenv("PUBLISH_REPO", "")
         token = _os.getenv("GITHUB_PUBLISH_TOKEN", "") or _os.getenv("GITHUB_TOKEN", "")
-        history_titles = load_recent_titles(
+        history_titles, history_meta = load_recent_history(
             artifacts_dir=artifacts_root,
             window_days=history_days,
             repo=repo, token=token,
             exclude_date=date,
         )
-    except Exception:
-        pass
+        editorial_meta.update(history_meta)
+        tracer.log("history_loaded", **history_meta)
+    except Exception as e:
+        editorial_meta.update({
+            "history_source": "error",
+            "history_entry_count": 0,
+            "history_error": str(e)[:200],
+        })
+        tracer.log("history_load_error", error=str(e))
 
     # 3. Rule-based scoring.
     events = score_events_rules(events, history_titles=history_titles,
