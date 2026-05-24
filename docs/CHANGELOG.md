@@ -1,5 +1,36 @@
 # Changelog
 
+## v2.7 (2026-05-24) — 编辑新鲜度与阅读体验优化
+
+### 问题
+对 2026-05-24 日报复盘后，发现自动编辑已经能生成完整日报，但离 Juya 式人工审核还有几个明显差距：
+- 历史去重只读本地 draft 或 GitHub issue 标题；GitHub Actions 环境没有昨天 artifacts 时，只能看到“AI 日报 2026-05-24”这类 issue 标题，无法识别正文里已经发布过的事件。
+- 已报道事件只做轻微扣分，DeepSeek 定价页、Google I/O 这类同 URL/同事件容易隔天再次进入主稿。
+- 同一来源/同一厂商的多个更新会挤占版面，读起来像厂商更新列表，而不是编辑精选。
+- Google AI Edge / LiteRT-LM / AI Edge Gallery 等同主题事件没有合并，容易拆成多条。
+- 官方 X 发布源（如 StepFun）会因为社媒形态被误归到“前瞻与传闻”。
+- 概览段落仍偏“条目堆叠”，且弱信号限定词容易污染整段；正文第二段有时只写泛泛影响，没有回答“谁受影响、下一步看什么”。
+
+### 修复
+
+| # | 改动 | 文件 | 效果 |
+|---|------|------|------|
+| 27 | `load_recent_titles` 增加 GitHub issue 正文解析，抽取概览/正文 Markdown 链接标题和 URL，并支持排除当天 issue | `history_checker.py` `daily_report.py` | CI 环境也能识别最近已发布条目，避免把今天自己的 issue 纳入历史 |
+| 28 | 历史命中从“轻扣分”改为强降权：同标题或同 canonical URL 已报道且无实质后续时，分数封顶到 0.24 | `event_scorer.py` | 重复旧事件不再凭高基础分进入要闻 |
+| 29 | Final selector 对 `already_reported` 且无实质后续的事件直接视为 stale background | `final_selector.py` | LLM 误选旧事件时，最终选择阶段仍能兜底过滤 |
+| 30 | 同一来源默认最多 2 条，`must_include` 最多 3 条，并修复第一轮选择未累计 source count 的问题 | `final_selector.py` | 减少 Google/单一厂商 bundle 刷屏 |
+| 31 | 新增 `google_ai_edge` story key，合并 LiteRT-LM、AI Edge Gallery、Gemma 端侧更新 | `final_selector.py` | 同主题多篇官方博客只保留最有代表性的一条 |
+| 32 | 官方 X 发布源不再被默认归为前瞻；新增 StepFun/StepAudio 模型识别 | `section_classifier.py` `final_selector.py` `writer.py` | StepAudio 2.5 Realtime 等官方发布进入“模型发布” |
+| 33 | Writer 自动重建 overview 为“今日主线 + 确认重点 + 前瞻信号”，并按整句取舍避免中文标题硬截断 | `writer.py` | 概览更像编辑判断，不再只是新闻清单 |
+| 34 | Writer prompt 强制第二段回答“谁受影响”和“下一步看什么信号” | `prompts.yaml` | 正文分析更有读者价值，减少空泛句 |
+
+### 验证
+- 本地编译：`python -m compileall agent -q`
+- 定向测试：`python -m pytest tests/test_research_editor.py tests/test_writer_output_schema.py -q`
+- 全量测试：`python -m pytest -q`
+- GitHub Actions：`Test` run `26355413960` 通过
+- 提交：`4a1e3ab feat: improve daily editorial freshness`
+
 ## v2.3 (2026-05-21) — 覆盖大幅提升 & 架构优化
 
 ### 核心目标
