@@ -67,6 +67,7 @@ def _run_research_editor_flow(
     evidence_urls_per_event: int,
     llm_timeout: int,
     artifacts_root: str,
+    date: str = "",
 ):
     """Run the full Research Editor curation pipeline.
 
@@ -91,6 +92,7 @@ def _run_research_editor_flow(
             artifacts_dir=artifacts_root,
             window_days=history_days,
             repo=repo, token=token,
+            exclude_date=date,
         )
     except Exception:
         pass
@@ -572,6 +574,7 @@ def run_pipeline(
                 evidence_urls_per_event=evidence_urls_per_event,
                 llm_timeout=llm_timeout,
                 artifacts_root=artifacts_root,
+                date=date,
             )
             # Write editorial meta to trace.
             for key in ("fallback_used", "fallback_reason", "llm_selected_count",

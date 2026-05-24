@@ -255,6 +255,7 @@ def _fallback_draft_from_items(
         f"本期精选 {len(selected)} 条 AI 动态，头条关注"
         f"{_strip_item_number(headline)}。"
     )
+    overview = _editorial_overview_from_sections(overview, sections)
     return Draft(
         date=date,
         title=f"AI 日报 | {date}",
@@ -337,7 +338,7 @@ def _complete_draft_with_items(
     sections = _renumber_sections(buckets)
     overview_groups = _overview_groups_from_sections(sections)
     item_count = sum(len(s.items) for s in sections)
-    overview = _cautious_overview(draft.overview, sections)
+    overview = _editorial_overview_from_sections(draft.overview, sections)
     if added:
         tracer.log("writer_completed_from_curated", added=added, item_count=item_count)
 
@@ -391,7 +392,7 @@ def _renumber_sections(buckets: Dict[str, List[DraftItem]]) -> List[DraftSection
 def _prune_empty_sections(draft: Draft) -> Draft:
     sections = [section for section in draft.sections if section.items]
     overview_groups = _overview_groups_from_sections(sections)
-    overview = _cautious_overview(draft.overview, sections)
+    overview = _editorial_overview_from_sections(draft.overview, sections)
     return draft.model_copy(update={
         "sections": sections,
         "overview_groups": overview_groups,
@@ -824,6 +825,91 @@ def _headline_candidate_from_text(text: str) -> str:
     return parts[0].strip()
 
 
+def _editorial_overview_from_sections(overview: str, sections: List[DraftSection]) -> str:
+    flat = [item for section in sections for item in section.items]
+    if len(flat) < 3:
+        return _cautious_overview(overview, sections)
+
+    themes = _overview_themes(sections)
+    if not themes:
+        return _cautious_overview(overview, sections)
+
+    confirmed = [item for item in flat if not _is_weak_item_for_overview(item)]
+    weak = [item for item in flat if _is_weak_item_for_overview(item)]
+    base_sentence = f"今天主线是{_join_cn(themes[:3])}。"
+    lines = [base_sentence]
+
+    lead_titles = [_overview_title(item) for item in confirmed[:2]]
+    lead_titles = [t for t in lead_titles if t]
+    if lead_titles:
+        lines.append(f"确认消息里，{'、'.join(lead_titles[:2])}是重点。")
+
+    weak_sentence = ""
+    if weak:
+        weak_title = _overview_title(weak[0])
+        if weak_title:
+            weak_sentence = f"前瞻信号则看{weak_title}，仍需等待进一步确认。"
+            lines.append(weak_sentence)
+
+    text = "".join(lines)
+    if len(text) > 180:
+        lines = [base_sentence]
+        if lead_titles:
+            lines.append(f"确认消息里，{lead_titles[0]}是重点。")
+        if weak_sentence:
+            lines.append(weak_sentence)
+        text = "".join(lines)
+    if len(text) > 180:
+        lines = [base_sentence]
+        if lead_titles:
+            lines.append(f"确认消息里，{lead_titles[0]}是重点。")
+        text = "".join(lines)
+    return text
+
+
+def _overview_themes(sections: List[DraftSection]) -> List[str]:
+    flat = [(section.heading, item) for section in sections for item in section.items]
+    checks = [
+        ("模型成本战", lambda h, t: any(k in t for k in ("降价", "定价", "价格", "pricing", "price", "1/4"))),
+        ("Agent 工程化", lambda h, t: any(k in t for k in ("agent", "mcp", "genkit", "copilot", "codex", "cli", "sdk", "中间件", "智能体"))),
+        ("新模型发布", lambda h, t: h == "模型发布" or any(k in t for k in ("模型", "qwen", "gpt", "claude", "gemini", "stepaudio"))),
+        ("端侧与产品落地", lambda h, t: h == "产品应用" or any(k in t for k in ("端侧", "edge", "mobile", "android", "插件", "产品", "应用"))),
+        ("AI 安全与研究", lambda h, t: h == "技术与洞察" and any(k in t for k in ("漏洞", "安全", "论文", "arxiv", "benchmark", "基准"))),
+        ("资本与企业采用", lambda h, t: h == "行业动态" or any(k in t for k in ("融资", "估值", "财报", "gartner", "企业"))),
+    ]
+    out: List[str] = []
+    for label, pred in checks:
+        if any(pred(h, f"{item.title} {item.summary}".lower()) for h, item in flat):
+            out.append(label)
+    return out
+
+
+def _overview_title(item: DraftItem) -> str:
+    title = _strip_item_number(item.title)
+    title = _compress_headline(title, max_len=48)
+    return title.rstrip("。").strip()
+
+
+def _join_cn(items: List[str]) -> str:
+    items = [i for i in items if i]
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return f"{items[0]}{_and_sep(items[0], items[1])}{items[1]}"
+    return "、".join(items[:-1]) + f"{_and_sep(items[-2], items[-1])}{items[-1]}"
+
+
+def _and_sep(left: str, right: str) -> str:
+    if (
+        (left and _re_mod.search(r"[A-Za-z0-9]$", left))
+        or (right and _re_mod.search(r"^[A-Za-z0-9]", right))
+    ):
+        return " 和 "
+    return "和"
+
+
 def _compress_headline(text: str, max_len: int = 56) -> str:
     text = _headline_candidate_from_text(text)
     if not text:
@@ -1019,7 +1105,7 @@ def _is_official_social_item(item: CuratedItem) -> bool:
         "x_openai", "openai", "x_anthropic", "x_anthropicai",
         "x_googledeepmind", "x_gemini_app", "x_alibaba_qwen", "x_qwen",
         "x_deepseek", "x_deepseek_ai", "x_tencent_hunyuan",
-        "x_zhipu", "x_moonshot", "x_minimax",
+        "x_zhipu", "x_moonshot", "x_minimax", "x_stepfun",
     }
     return source in official_sources or "tier_0" in (item.source_tier or "").lower()
 

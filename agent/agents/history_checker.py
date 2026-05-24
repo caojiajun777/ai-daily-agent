@@ -17,8 +17,15 @@ def load_recent_titles(
     window_days: int = 7,
     repo: str = "",
     token: str = "",
+    exclude_date: str = "",
 ) -> List[str]:
-    """Load titles from recent daily reports. Best-effort, never raises."""
+    """Load recent published item titles/URLs. Best-effort, never raises.
+
+    GitHub Actions runs do not retain yesterday's local artifacts by default,
+    so the GitHub Issues fallback must parse the issue body, not just the issue
+    title ("AI 日报 2026-05-24"). The returned list intentionally contains
+    both item titles and source URLs; downstream scorers can use either signal.
+    """
     titles: List[str] = []
 
     # 1. Try local artifacts/drafts.
@@ -26,6 +33,8 @@ def load_recent_titles(
     if os.path.isdir(drafts_dir):
         for fname in sorted(os.listdir(drafts_dir), reverse=True):
             if not fname.endswith(".json"):
+                continue
+            if exclude_date and fname.startswith(exclude_date):
                 continue
             try:
                 path = os.path.join(drafts_dir, fname)
@@ -39,6 +48,9 @@ def load_recent_titles(
                         t = item.get("title", "")
                         if t:
                             titles.append(t)
+                        u = item.get("url", "")
+                        if u:
+                            titles.append(u)
             except Exception:
                 pass
         if titles:
@@ -48,21 +60,20 @@ def load_recent_titles(
     if repo and token:
         try:
             import httpx
-            r = httpx.get(
-                f"https://api.github.com/repos/{repo}/issues",
-                params={"state": "all", "labels": "agent-generated",
-                        "per_page": 10, "sort": "created", "direction": "desc"},
-                headers={"Authorization": f"Bearer {token}",
-                         "Accept": "application/vnd.github.v3+json",
-                         "User-Agent": "report-agent-history"},
-                timeout=15.0,
-            )
-            for issue in r.json() if r.status_code == 200 else []:
-                titles.append(issue.get("title", ""))
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "report-agent-history",
+            }
+            issues = _fetch_recent_issues(repo, headers, window_days, exclude_date=exclude_date)
+            if not issues:
+                issues = _fetch_recent_issues(repo, headers, window_days, labels="", exclude_date=exclude_date)
+            for issue in issues:
+                titles.extend(_extract_issue_history_entries(issue))
         except Exception:
             pass
 
-    return titles[:200]
+    return _dedupe_keep_order(titles)[:300]
 
 
 def check_already_reported(
@@ -99,3 +110,93 @@ def is_meaningful_update(
 
 def _norm(text: str) -> str:
     return re.sub(r"[^\w一-鿿]", "", text.lower())
+
+
+def _fetch_recent_issues(
+    repo: str,
+    headers: dict,
+    window_days: int,
+    *,
+    labels: str = "agent-generated",
+    exclude_date: str = "",
+) -> List[dict]:
+    import httpx
+    from datetime import datetime, timedelta, timezone
+
+    params = {
+        "state": "all",
+        "per_page": 20,
+        "sort": "created",
+        "direction": "desc",
+    }
+    if labels:
+        params["labels"] = labels
+    r = httpx.get(
+        f"https://api.github.com/repos/{repo}/issues",
+        params=params,
+        headers=headers,
+        timeout=15.0,
+    )
+    if r.status_code != 200:
+        return []
+    cutoff = datetime.now(timezone.utc) - timedelta(days=max(1, window_days))
+    out = []
+    for issue in r.json():
+        if "pull_request" in issue:
+            continue
+        created = issue.get("created_at") or ""
+        try:
+            created_dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
+            if created_dt < cutoff:
+                continue
+        except Exception:
+            pass
+        title = issue.get("title", "")
+        if exclude_date and exclude_date in title:
+            continue
+        if title.startswith("AI 日报") or "AI 日报" in title:
+            out.append(issue)
+    return out
+
+
+_MD_LINK_RE = re.compile(r"\[(?:#\d+\s*)?([^\]]+?)\]\((https?://[^)]+)\)")
+
+
+def _extract_issue_history_entries(issue: dict) -> List[str]:
+    entries = []
+    title = issue.get("title", "")
+    if title:
+        entries.append(title)
+    body = issue.get("body") or ""
+    for line in body.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        # Overview bullets and detail headings both use Markdown links.
+        for m in _MD_LINK_RE.finditer(line):
+            linked_title = _strip_markdown_title(m.group(1))
+            url = m.group(2).strip()
+            if linked_title and not linked_title.startswith("原文"):
+                entries.append(linked_title)
+            if url:
+                entries.append(url)
+                if linked_title:
+                    entries.append(f"{linked_title} {url}")
+    return entries
+
+
+def _strip_markdown_title(title: str) -> str:
+    title = re.sub(r"^\s*#?\d+[\s.、:-]*", "", title or "").strip()
+    return re.sub(r"\s+", " ", title)
+
+
+def _dedupe_keep_order(values: List[str]) -> List[str]:
+    out = []
+    seen = set()
+    for value in values:
+        value = (value or "").strip()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        out.append(value)
+    return out

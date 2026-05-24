@@ -518,10 +518,71 @@ def test_overview_scopes_reported_qualifier_to_weak_sentence(tmp_path):
         complete_with_items=True,
     )
 
-    assert draft.overview.startswith("Google I/O 发布")
+    assert draft.overview.startswith("今天主线是")
     assert "DeepSeek-V4-Pro API 永久降价" in draft.overview
     assert "据报道，Google" not in draft.overview
-    assert "Anthropic 被曝" in draft.overview
+    assert "Anthropic" in draft.overview
+    assert "仍需等待进一步确认" in draft.overview
+
+
+def test_writer_rebuilds_overview_as_editorial_mainlines(tmp_path):
+    valid = json.dumps(
+        {
+            "date": "2026-05-09",
+            "title": "T",
+            "overview": "Google 发布更新。DeepSeek 降价。Qwen 发布模型。",
+            "sections": [
+                {"heading": "要闻", "items": [
+                    {
+                        "title": "#1 DeepSeek-V4-Pro API 永久降价",
+                        "summary": "DeepSeek-V4-Pro API 永久降价。",
+                        "url": "https://example.com/pricing",
+                        "source": "src",
+                        "confidence": "high",
+                    }
+                ]},
+                {"heading": "模型发布", "items": [
+                    {
+                        "title": "#2 Qwen3.7-Max 发布",
+                        "summary": "阿里发布 Qwen3.7-Max 模型。",
+                        "url": "https://example.com/qwen",
+                        "source": "src",
+                        "confidence": "high",
+                    }
+                ]},
+                {"heading": "开发生态", "items": [
+                    {
+                        "title": "#3 Genkit Middleware 加固 Agent 应用",
+                        "summary": "Genkit Middleware 支持 Agent 应用拦截和扩展。",
+                        "url": "https://example.com/genkit",
+                        "source": "src",
+                        "confidence": "high",
+                    }
+                ]},
+            ],
+        },
+        ensure_ascii=False,
+    )
+    provider = _provider_emitting(valid)
+    tracer = Tracer(str(tmp_path / "t.jsonl"), run_id="r")
+    budget = BudgetTracker(100_000, 10_000, 10)
+
+    draft = write_draft(
+        provider=provider,
+        items=[],
+        date="2026-05-09",
+        system_prompt="s",
+        user_template="d={date} m={max_items} i={items_json}",
+        max_items=5,
+        tracer=tracer,
+        budget=budget,
+        complete_with_items=True,
+    )
+
+    assert draft.overview.startswith("今天主线是")
+    assert "模型成本战" in draft.overview
+    assert "Agent 工程化" in draft.overview
+    assert "确认消息里" in draft.overview
 
 
 def test_render_markdown_softens_unsupported_price_comparisons():

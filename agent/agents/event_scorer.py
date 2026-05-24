@@ -40,17 +40,18 @@ def score_events(
 ) -> List[EventCluster]:
     """Score events and return top-N sorted by rule_score desc."""
     now_ts = _time.time()
-    history_set = set(_norm_history(t) for t in (history_titles or []))
+    history_entries = history_titles or []
+    history_set = set(_norm_history(t) for t in history_entries)
 
     for evt in events:
-        evt.rule_score = _score_one(evt, now_ts, history_set, history_titles)
+        evt.rule_score = _score_one(evt, now_ts, history_set, history_entries)
 
     events.sort(key=lambda e: e.rule_score, reverse=True)
     return events[:max_items]
 
 
 def _score_one(evt: EventCluster, now_ts: float, history_set: set,
-               history_titles: Optional[List[str]] = None) -> float:
+               history_entries: Optional[List[str]] = None) -> float:
     ai_rel = _ai_relevance_score(evt)          # 0-1
     novelty = _event_novelty(evt)               # 0-1
     reader_u = _reader_utility(evt)             # 0-1
@@ -72,13 +73,20 @@ def _score_one(evt: EventCluster, now_ts: float, history_set: set,
     score = _apply_staleness_gate(evt, score, now_ts)
 
     # ── Penalties ──────────────────────────────────────────────────────
-    # Already reported penalty.
+    # Already reported penalty. This is deliberately stronger than a normal
+    # freshness penalty: a daily report should not keep re-publishing yesterday's
+    # exact URL/event unless there is a real follow-up.
     norm_title = _norm_for_history(evt.canonical_title)
-    if any(_title_overlap(norm_title, ht) > 0.70 for ht in history_set):
-        if history_titles and _is_meaningful_update(evt):
-            score -= 0.04
+    history_hit = (
+        any(_title_overlap(norm_title, ht) > 0.74 for ht in history_set)
+        or _history_url_overlap(evt, history_entries or [])
+    )
+    evt.already_reported = bool(history_hit)
+    if history_hit:
+        if _is_material_followup_update(evt):
+            score = min(score - 0.06, 0.55)
         else:
-            score -= 0.12
+            score = min(score - 0.22, 0.24)
 
     # Marketing/clickbait penalty.
     marketing_words = ["独家", "重磅", "炸裂", "震惊", "突发", "颠覆",
@@ -346,6 +354,39 @@ def _is_meaningful_update(evt: EventCluster) -> bool:
         "财报", "earnings", "revenue", "营收", "融资",
     ]
     return any(s in text for s in update_signals)
+
+
+def _is_material_followup_update(evt: EventCluster) -> bool:
+    """Narrower than generic 'release/update': used for history repeats."""
+    text = (evt.canonical_title + " " + evt.summary).lower()
+    followup_signals = [
+        "follow-up", "now available", "general availability", "ga",
+        "rollout expands", "expands rollout", "patch", "fix", "fixed",
+        "security patch", "new benchmark", "benchmark update",
+        "price cut", "pricing change", "completed funding", "closed funding",
+        "正式上线", "全面开放", "扩大开放", "新增", "补充", "修复",
+        "安全补丁", "基准更新", "价格调整", "融资完成", "正式敲定",
+    ]
+    return any(s in text for s in followup_signals)
+
+
+def _history_url_overlap(evt: EventCluster, history_entries: List[str]) -> bool:
+    if not history_entries:
+        return False
+    from urllib.parse import urlparse, urlunparse
+
+    def canon(url: str) -> str:
+        try:
+            p = urlparse(url)
+            host = p.netloc.lower().replace("www.", "")
+            return urlunparse((p.scheme or "https", host, p.path.rstrip("/") or "/", "", "", ""))
+        except Exception:
+            return url
+
+    history_urls = {canon(entry) for entry in history_entries if entry.startswith(("http://", "https://"))}
+    if not history_urls:
+        return False
+    return any(canon(url) in history_urls for url in evt.source_urls)
 
 
 def _title_overlap(a: str, b: str) -> float:

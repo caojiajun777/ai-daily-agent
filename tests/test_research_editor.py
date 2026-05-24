@@ -11,6 +11,7 @@ from agent.agents.research_editor import (
 )
 from agent.agents.final_selector import select_final_items
 from agent.agents.final_selector import _story_key
+from agent.agents.history_checker import _extract_issue_history_entries
 from agent.agents.section_classifier import guess_section
 from agent.sources.base import RawItem
 
@@ -306,6 +307,184 @@ def test_google_io_rollup_and_antigravity_share_story_key():
     )
 
     assert _story_key(rollup) == _story_key(antigravity) == "google_io_2026"
+
+
+def test_google_ai_edge_updates_share_story_key():
+    litert = EventCluster(
+        event_id="evt_litert",
+        canonical_title="LiteRT-LM brings Gemma 4 to fast on-device GenAI",
+        primary_url="https://developers.googleblog.com/litert-lm",
+        source_urls=["https://developers.googleblog.com/litert-lm"],
+        source_names=["google_developers_blog"],
+        source_types=["rss"],
+        source_count=1,
+        summary="Google AI Edge发布 LiteRT-LM，为 Gemma 4 提供端侧推理。",
+    )
+    gallery = EventCluster(
+        event_id="evt_gallery",
+        canonical_title="A smarter Google AI Edge Gallery with MCP integration",
+        primary_url="https://developers.googleblog.com/ai-edge-gallery",
+        source_urls=["https://developers.googleblog.com/ai-edge-gallery"],
+        source_names=["google_developers_blog"],
+        source_types=["rss"],
+        source_count=1,
+        summary="Google AI Edge Gallery 引入 MCP 集成。",
+    )
+
+    assert _story_key(litert) == _story_key(gallery) == "google_ai_edge"
+
+
+def test_history_checker_extracts_item_titles_and_urls_from_issue_body():
+    issue = {
+        "title": "AI 日报 2026-05-24",
+        "body": """
+### 要闻
+- [#1 DeepSeek-V4-Pro API 永久降价](https://api-docs.deepseek.com/zh-cn/quick_start/pricing)（deepseek_pricing）
+
+## [Google I/O 2026 发布 Gemini 3.5 与 Antigravity 2.0](https://developers.googleblog.com/io) #2
+
+相关链接：
+- [原文](https://developers.googleblog.com/io)
+""",
+    }
+
+    entries = _extract_issue_history_entries(issue)
+
+    assert "DeepSeek-V4-Pro API 永久降价" in entries
+    assert "https://api-docs.deepseek.com/zh-cn/quick_start/pricing" in entries
+    assert "Google I/O 2026 发布 Gemini 3.5 与 Antigravity 2.0" in entries
+
+
+def test_history_overlap_marks_repeated_event_and_demotes_score():
+    event = EventCluster(
+        event_id="evt_deepseek",
+        canonical_title="DeepSeek-V4-Pro API 2.5 折优惠转为永久正式定价",
+        primary_url="https://api-docs.deepseek.com/zh-cn/quick_start/pricing",
+        source_urls=["https://api-docs.deepseek.com/zh-cn/quick_start/pricing"],
+        source_names=["deepseek_pricing"],
+        source_types=["pricing_snapshot"],
+        source_count=1,
+        primary_source_tier="tier_0_core_evidence",
+        primary_evidence_type="pricing_page",
+        summary="官方定价页显示优惠转为永久正式定价。",
+    )
+
+    scored = score_events(
+        [event],
+        history_titles=[
+            "DeepSeek-V4-Pro API 永久降价",
+            "https://api-docs.deepseek.com/zh-cn/quick_start/pricing",
+        ],
+        max_items=1,
+    )
+
+    assert scored[0].already_reported is True
+    assert scored[0].rule_score <= 0.24
+
+
+def test_selector_skips_already_reported_without_material_update():
+    old = EventCluster(
+        event_id="evt_old",
+        canonical_title="Google I/O 2026 发布 Gemini 3.5 与 Antigravity 2.0",
+        primary_url="https://developers.googleblog.com/io",
+        source_urls=["https://developers.googleblog.com/io"],
+        source_names=["google_developers_blog"],
+        source_types=["rss"],
+        source_count=1,
+        summary="Google I/O 2026 发布 Gemini 3.5。",
+        rule_score=0.95,
+        already_reported=True,
+    )
+    fresh = EventCluster(
+        event_id="evt_fresh",
+        canonical_title="GitHub Copilot for Eclipse 以 MIT 许可证开源",
+        primary_url="https://github.blog/changelog/eclipse",
+        source_urls=["https://github.blog/changelog/eclipse"],
+        source_names=["github_copilot_changelog"],
+        source_types=["rss"],
+        source_count=1,
+        summary="GitHub 发布 Copilot for Eclipse 开源消息。",
+        rule_score=0.7,
+    )
+    output = ResearchEditorOutput(selected=[
+        EditorialDecision(event_id="evt_old", decision="select", priority="high",
+                          section="要闻", sources_to_use=[SourceUse(url=old.primary_url)]),
+        EditorialDecision(event_id="evt_fresh", decision="select", priority="high",
+                          section="开发生态", sources_to_use=[SourceUse(url=fresh.primary_url)]),
+    ])
+
+    items, _recs, _meta = select_final_items(
+        editor_output=output, events=[old, fresh], min_items=1, max_items=3, min_papers=0)
+
+    assert [item.url for item in items] == [fresh.primary_url]
+
+
+def test_selector_caps_same_source_to_reduce_vendor_bundles():
+    events = []
+    decisions = []
+    for i in range(3):
+        event = EventCluster(
+            event_id=f"evt_google_{i}",
+            canonical_title=f"Google Developer update {i}",
+            primary_url=f"https://developers.googleblog.com/update-{i}",
+            source_urls=[f"https://developers.googleblog.com/update-{i}"],
+            source_names=["google_developers_blog"],
+            source_types=["rss"],
+            source_count=1,
+            summary="Google 发布开发者更新。",
+            rule_score=0.9 - i * 0.01,
+        )
+        events.append(event)
+        decisions.append(EditorialDecision(
+            event_id=event.event_id, decision="select", priority="high",
+            section="开发生态", sources_to_use=[SourceUse(url=event.primary_url)],
+        ))
+    other = EventCluster(
+        event_id="evt_other",
+        canonical_title="OpenAI 发布企业案例",
+        primary_url="https://openai.com/index/case",
+        source_urls=["https://openai.com/index/case"],
+        source_names=["openai_news"],
+        source_types=["rss"],
+        source_count=1,
+        summary="OpenAI 发布企业案例。",
+        rule_score=0.7,
+    )
+    events.append(other)
+    decisions.append(EditorialDecision(
+        event_id="evt_other", decision="select", priority="high",
+        section="产品应用", sources_to_use=[SourceUse(url=other.primary_url)],
+    ))
+
+    items, _recs, _meta = select_final_items(
+        editor_output=ResearchEditorOutput(selected=decisions),
+        events=events,
+        min_items=1,
+        max_items=4,
+        min_papers=0,
+    )
+
+    google_items = [item for item in items if item.source == "google_developers_blog"]
+    assert len(google_items) == 2
+
+
+def test_official_x_model_launch_is_model_release_not_rumor():
+    event = EventCluster(
+        event_id="evt_stepaudio",
+        canonical_title="StepAudio 2.5 Realtime 发布：副语言感知与人格化交互",
+        primary_url="https://x.com/StepFun_ai/status/2058303294544425197",
+        source_urls=["https://x.com/StepFun_ai/status/2058303294544425197"],
+        source_names=["x_stepfun"],
+        source_types=["x_cookie"],
+        source_count=1,
+        primary_source_tier="tier_0_core_evidence",
+        primary_content_type="china_model_official",
+        primary_evidence_type="official_social",
+        primary_confidence="high",
+        summary="阶跃星辰官方 X 发布 StepAudio 2.5 Realtime 实时语音模型。",
+    )
+
+    assert guess_section(event) == "模型发布"
 
 
 def test_final_selector_normalizes_model_release_sections():

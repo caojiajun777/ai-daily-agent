@@ -82,6 +82,8 @@ def _is_tier3_pulse(evt: EventCluster) -> bool:
 
 
 def _is_forward_or_rumor(evt: EventCluster, text: str) -> bool:
+    if _is_official_release_source(evt) and (evt.primary_confidence or "").lower() != "low":
+        return False
     if _has_any(text, _RUMOR_TERMS):
         return True
     ctype = (evt.primary_content_type or "").lower()
@@ -104,6 +106,7 @@ def _is_official_release_source(evt: EventCluster) -> bool:
         "microsoft_ai_blog", "huggingface_blog", "ollama_releases",
         "x_openai", "x_anthropicai", "x_alibaba_qwen", "x_qwen",
         "x_tencent_hunyuan", "x_deepseek_ai", "x_googledeepmind",
+        "x_stepfun",
     }
     official_url_markers = (
         "openai.com/index/",
@@ -117,6 +120,7 @@ def _is_official_release_source(evt: EventCluster) -> bool:
         "x.com/openai/",
         "x.com/alibaba_qwen/",
         "x.com/tencenthunyuan/",
+        "x.com/stepfun_ai/",
     )
     return bool(names & official_source_ids) or any(marker in urls for marker in official_url_markers)
 
@@ -261,7 +265,8 @@ _PRODUCT_APPLICATION_TERMS = (
 _MODEL_FAMILY_TERMS = (
     "gpt", "claude", "gemini", "qwen", "deepseek", "hunyuan",
     "hy-mt", "hymt", "llama", "mistral", "kimi", "ernie", "glm",
-    "doubao", "minimax", "yi-", "seed-", "opus", "sonnet",
+    "doubao", "minimax", "stepaudio", "stepfun", "yi-", "seed-",
+    "opus", "sonnet",
 )
 
 _MODEL_OBJECT_TERMS = (
@@ -289,7 +294,7 @@ _MODEL_CAPABILITY_TERMS = (
 )
 
 _MODEL_VERSION_RE = re.compile(
-    r"\b(?:gpt|claude|gemini|qwen|deepseek|hunyuan|hy-mt|llama|mistral|kimi|glm|ernie)"
+    r"\b(?:gpt|claude|gemini|qwen|deepseek|hunyuan|hy-mt|llama|mistral|kimi|glm|ernie|stepaudio)"
     r"[-\s]?\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b"
 )
 _PARAMETER_SCALE_RE = re.compile(r"\b\d+(?:\.\d+)?\s?(?:b|m|t)\b|[0-9]+(?:\.[0-9]+)?\s?亿参数")

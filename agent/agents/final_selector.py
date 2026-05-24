@@ -180,6 +180,8 @@ def select_final_items(
         key = _story_key(evt)
         if respect_story and key and story_counts.get(key, 0) >= 1:
             return False
+        if source_diversity and _source_cap_exceeded(evt, source_counts, priority=priority):
+            return False
 
         dec, created = ensure_decision(evt, sec, priority=priority)
         if created or _normalize_section(dec.section or "") not in section_order:
@@ -205,10 +207,14 @@ def select_final_items(
                 continue
             if key and story_counts.get(key, 0) >= 1:
                 continue
+            if source_diversity and _source_cap_exceeded(evt, source_counts, priority=d.priority):
+                continue
             final_ids.append(eid)
             section_counts[sec] += 1
             if key:
                 story_counts[key] += 1
+            for src in evt.source_names:
+                source_counts[src] += 1
 
     # Second pass: fill by priority, respecting caps.
     for eid in sorted_ids:
@@ -235,11 +241,7 @@ def select_final_items(
         if key and story_counts.get(key, 0) >= 1:
             continue
         if evt and source_diversity:
-            max_src = max(
-                (source_counts.get(s, 0) for s in evt.source_names),
-                default=0,
-            )
-            if max_src >= 3 and d.priority not in ("high", "must_include"):
+            if _source_cap_exceeded(evt, source_counts, priority=d.priority):
                 continue
 
         final_ids.append(eid)
@@ -268,10 +270,14 @@ def select_final_items(
             key = _story_key(evt)
             if key and story_counts.get(key, 0) >= 1:
                 continue
+            if source_diversity and _source_cap_exceeded(evt, source_counts, priority=d.priority):
+                continue
             final_ids.append(eid)
             section_counts[d_section] += 1
             if key:
                 story_counts[key] += 1
+            for src in (evt.source_names if evt else []):
+                source_counts[src] += 1
             missing.remove(d_section)
 
     # Pull strong section fillers from the full event pool before giving up.
@@ -343,10 +349,14 @@ def select_final_items(
                 key = _story_key(evt)
                 if respect_story and key and story_counts.get(key, 0) >= 1:
                     continue
+                if source_diversity and respect_caps and _source_cap_exceeded(evt, source_counts, priority=d.priority):
+                    continue
                 final_ids.append(eid)
                 section_counts[sec] += 1
                 if key:
                     story_counts[key] += 1
+                for src in (evt.source_names if evt else []):
+                    source_counts[src] += 1
             if len(final_ids) >= min_items:
                 break
 
@@ -623,6 +633,8 @@ def _story_key(evt: Optional[EventCluster]) -> str:
     text = f"{evt.canonical_title} {evt.summary}".lower()
     if _is_google_io_story(text):
         return "google_io_2026"
+    if _is_google_ai_edge_story(text):
+        return "google_ai_edge"
     patterns = [
         r"\bqwen\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
         r"\bgpt-\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
@@ -645,6 +657,39 @@ def _is_google_io_story(text: str) -> bool:
         or "io 2026" in text
         or "antigravity" in text
     )
+
+
+def _is_google_ai_edge_story(text: str) -> bool:
+    return (
+        "google ai edge" in text
+        or "ai edge gallery" in text
+        or "litert-lm" in text
+        or "litert lm" in text
+        or ("gemma 4" in text and any(k in text for k in ("edge", "端侧", "on-device", "mobile")))
+    )
+
+
+def _source_cap_exceeded(
+    evt: Optional[EventCluster],
+    source_counts: Counter,
+    *,
+    priority: str,
+) -> bool:
+    if evt is None or not evt.source_names:
+        return False
+    cap = 3 if priority == "must_include" else 2
+    return max((source_counts.get(s, 0) for s in evt.source_names), default=0) >= cap
+
+
+def _is_material_history_update(evt: EventCluster) -> bool:
+    text = f"{evt.canonical_title} {evt.summary}".lower()
+    return any(k in text for k in (
+        "follow-up", "now available", "general availability", "patch", "fix",
+        "security patch", "new benchmark", "benchmark update", "price cut",
+        "pricing change", "completed funding", "closed funding",
+        "正式上线", "全面开放", "扩大开放", "新增", "补充", "修复",
+        "安全补丁", "基准更新", "价格调整", "融资完成", "正式敲定",
+    ))
 
 
 def _fallback_why_it_matters(evt: EventCluster) -> str:
@@ -695,6 +740,7 @@ def _is_official_primary(source_name: str, url: str) -> bool:
         "microsoft_ai_blog", "huggingface_blog", "ollama_releases",
         "x_openai", "x_anthropicai", "x_alibaba_qwen", "x_qwen",
         "x_tencent_hunyuan", "x_deepseek_ai", "x_googledeepmind",
+        "x_stepfun",
     }
     official_url_markers = (
         "openai.com/index/",
@@ -708,12 +754,17 @@ def _is_official_primary(source_name: str, url: str) -> bool:
         "x.com/openai/",
         "x.com/alibaba_qwen/",
         "x.com/tencenthunyuan/",
+        "x.com/stepfun_ai/",
     )
     return s in official_source_ids or any(marker in u for marker in official_url_markers)
 
 
 def _is_stale_background_event(evt: Optional[EventCluster]) -> bool:
-    if evt is None or _staleness_exempt(evt):
+    if evt is None:
+        return False
+    if getattr(evt, "already_reported", False) and not _is_material_history_update(evt):
+        return True
+    if _staleness_exempt(evt):
         return False
     age_h = _event_age_hours(evt)
     if age_h is None or age_h < 168:
