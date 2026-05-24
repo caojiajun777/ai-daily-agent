@@ -380,8 +380,7 @@ def _renumber_sections(buckets: Dict[str, List[DraftItem]]) -> List[DraftSection
         renumbered: List[DraftItem] = []
         for item in buckets.get(heading, []):
             title = _strip_item_number(item.title)
-            if _looks_english_title(title):
-                title = _localized_title_from_item(item, title)
+            title = _polished_title_from_item(item, title)
             renumbered.append(item.model_copy(update={"title": f"#{seq} {title}"}))
             seq += 1
         if renumbered:
@@ -570,7 +569,7 @@ def render_markdown(draft: Draft) -> str:
     lines.append(f"# {draft.title}")
     lines.append("")
     if draft.overview:
-        lines.append(f"> {draft.overview}")
+        lines.append(f"> {_clean_public_text(draft.overview)}")
         lines.append("")
 
     flat_items = _flatten_items(draft)
@@ -625,7 +624,7 @@ def render_markdown(draft: Draft) -> str:
         if item.highlights:
             lines.append("要点：")
             for h in item.highlights:
-                lines.append(f"- {h}")
+                lines.append(f"- {_clean_public_text(h)}")
             lines.append("")
 
         if item.evidence_note:
@@ -758,6 +757,29 @@ def _clean_public_text(text: str) -> str:
         return ""
     text = _re_mod.sub(r"[（(]\s*配图显示[:：][^）)]*[）)]", "", text)
     text = _re_mod.sub(r"\s+", " ", text).strip()
+    return _soften_price_comparison_claims(text)
+
+
+def _soften_price_comparison_claims(text: str) -> str:
+    if not text:
+        return ""
+    if "公开价格口径" in text or "估算" in text:
+        return text
+    text = _re_mod.sub(
+        r"输出价格仅为\s*([A-Za-z][A-Za-z0-9_.-]*)\s*的\s*1/(\d+)",
+        r"按公开价格口径估算，输出价格约为 \1 的 1/\2",
+        text,
+    )
+    text = _re_mod.sub(
+        r"这一永久降价策略使\s*([^。；;，,]+?)\s*的输出价格比\s*([A-Za-z][A-Za-z0-9_.-]*)\s*低\s*(\d+)\s*倍(?:以上?)?",
+        r"按公开价格口径估算，\1 的输出价格约为 \2 的 1/\3",
+        text,
+    )
+    text = _re_mod.sub(
+        r"((?:[A-Za-z0-9_.-]+\s*)?输出价格)比\s*([A-Za-z][A-Za-z0-9_.-]*)\s*低\s*(\d+)\s*倍(?:以上?)?",
+        r"按公开价格口径估算，\1约为 \2 的 1/\3",
+        text,
+    )
     return text
 
 
@@ -768,16 +790,29 @@ def _looks_english_title(title: str) -> bool:
     return letters >= 12
 
 
-def _localized_title_from_item(item: DraftItem, fallback: str) -> str:
-    for candidate in (item.one_liner, item.summary):
-        text = _headline_candidate_from_text(candidate)
-        if not _re_mod.search(r"[\u4e00-\u9fff]", text):
-            continue
-        if 8 <= len(text) <= 44:
-            return text
-        if len(text) > 44:
-            return text[:44].rstrip("，,、；;：:")
-    return fallback
+def _polished_title_from_item(item: DraftItem, fallback: str) -> str:
+    fallback = _headline_candidate_from_text(fallback) or fallback
+    refs = [item.one_liner, item.summary]
+    candidates = [
+        _headline_candidate_from_text(text)
+        for text in (fallback, item.one_liner, item.summary)
+    ]
+    candidates = [_compress_headline(c) for c in candidates if c]
+    candidates = _dedupe([c for c in candidates if _headline_is_usable(c)])
+
+    needs_repair = (
+        _looks_english_title(fallback)
+        or _has_incomplete_ascii_tail(fallback, refs)
+        or _headline_has_bad_tail(fallback)
+    )
+    if needs_repair:
+        for candidate in candidates:
+            if not _has_incomplete_ascii_tail(candidate, refs) and not _headline_has_bad_tail(candidate):
+                if _re_mod.search(r"[\u4e00-\u9fff]", candidate):
+                    return candidate
+    if candidates:
+        return _shorten_headline(candidates[0])
+    return _shorten_headline(fallback)
 
 
 def _headline_candidate_from_text(text: str) -> str:
@@ -789,17 +824,121 @@ def _headline_candidate_from_text(text: str) -> str:
     return parts[0].strip()
 
 
+def _compress_headline(text: str, max_len: int = 56) -> str:
+    text = _headline_candidate_from_text(text)
+    if not text:
+        return ""
+    text = _re_mod.sub(r"\s+", " ", text).strip()
+    text = text.replace(" 系列和 ", " 与 ")
+    text = text.replace(" 系列与 ", " 与 ")
+    text = text.replace("系列和", "与")
+    text = text.replace("系列与", "与")
+    text = _re_mod.sub(
+        r"(Gemini\s*[0-9A-Za-z._-]+)\s*与\s*(Antigravity\s*[0-9A-Za-z._-]+)\s*(?:智能体)?平台",
+        r"\1 与 \2",
+        text,
+        flags=_re_mod.I,
+    )
+    comma_parts = _re_mod.split(r"[，,]", text, maxsplit=1)
+    if (
+        len(comma_parts) == 2
+        and 12 <= len(comma_parts[0].strip()) <= max_len
+        and _re_mod.search(r"^(匹配|对标|超越|但|并|同时|有望|可能)", comma_parts[1].strip())
+    ):
+        return comma_parts[0].strip()
+    if len(text) <= max_len:
+        return text
+    first_clause = _re_mod.split(r"[，,]", text, maxsplit=1)[0].strip()
+    if 12 <= len(first_clause) <= max_len:
+        return first_clause
+    text = _re_mod.sub(r"(智能体)?平台$", "", text).strip()
+    text = _re_mod.sub(r"(应用|工具|方案)$", "", text).strip()
+    return _shorten_headline(text, max_len=max_len)
+
+
+def _shorten_headline(text: str, max_len: int = 56) -> str:
+    text = (text or "").strip()
+    if len(text) <= max_len:
+        return text
+    cut = text[:max_len].rstrip()
+    for sep in ("，", ",", "；", ";", "：", ":", "、"):
+        pos = cut.rfind(sep)
+        if pos >= 16:
+            cut = cut[:pos]
+            break
+    next_char = text[len(cut):len(cut) + 1]
+    if next_char and _is_ascii_word_char(next_char) and cut and _is_ascii_word_char(cut[-1]):
+        cut = _re_mod.sub(r"\s+[A-Za-z][A-Za-z0-9_.-]*$", "", cut).rstrip()
+    return cut.rstrip("，,、；;：:和与及的")
+
+
+def _headline_is_usable(text: str) -> bool:
+    text = (text or "").strip()
+    return len(text) >= 6 and not _headline_has_bad_tail(text)
+
+
+def _headline_has_bad_tail(text: str) -> bool:
+    text = (text or "").strip()
+    if not text:
+        return True
+    return bool(_re_mod.search(r"(?:[，,、；;：:]|和|与|及|的)$", text))
+
+
+def _has_incomplete_ascii_tail(text: str, references: List[str]) -> bool:
+    text = (text or "").strip()
+    m = _re_mod.search(r"([A-Za-z][A-Za-z0-9_.-]*)$", text)
+    if not m:
+        return False
+    tail = m.group(1)
+    if tail.lower() in {
+        "api", "mcp", "agent", "agents", "codex", "openai", "google",
+        "github", "eclipse", "gemini", "claude", "qwen", "deepseek",
+    }:
+        return False
+    if len(tail) <= 2:
+        return True
+    for ref in references:
+        for word in _re_mod.findall(r"[A-Za-z][A-Za-z0-9_.-]+", ref or ""):
+            if word.lower().startswith(tail.lower()) and len(word) > len(tail):
+                return True
+    return False
+
+
+def _is_ascii_word_char(char: str) -> bool:
+    return bool(_re_mod.match(r"[A-Za-z0-9_.-]", char or ""))
+
+
 def _cautious_overview(overview: str, sections: List[DraftSection]) -> str:
     text = _clean_public_text(overview)
     if not text:
-        return text
-    if any(k in text for k in ("据报道", "报道称", "据称", "尚未确认", "未确认")):
         return text
     weak_items = [
         item for section in sections
         if section.heading == "前瞻与传闻"
         for item in section.items
+        if _is_weak_item_for_overview(item)
     ]
+    if not weak_items:
+        return _strip_leading_reported(text)
+    sentences = _split_sentences(text)
+    if sentences:
+        polished = []
+        for sentence in sentences:
+            body = sentence.strip()
+            if not body:
+                continue
+            unqualified = _strip_leading_reported(body)
+            is_weak = (
+                _sentence_matches_weak_item(unqualified, weak_items)
+                or _looks_like_weak_sentence(unqualified)
+            )
+            if is_weak:
+                if not any(k in body for k in ("据报道", "报道称", "据称", "消息称", "被曝", "尚未确认", "未确认")):
+                    body = f"据报道，{unqualified}"
+            else:
+                body = unqualified
+            polished.append(body)
+        return "".join(polished) if polished else text
     for item in weak_items:
         title = _strip_item_number(item.title)
         anchors = [
@@ -809,6 +948,40 @@ def _cautious_overview(overview: str, sections: List[DraftSection]) -> str:
         if any(anchor and anchor in text for anchor in anchors[:4]):
             return f"据报道，{text}"
     return text
+
+
+def _split_sentences(text: str) -> List[str]:
+    parts = _re_mod.findall(r"[^。！？；;]+[。！？；;]?", text)
+    return [p.strip() for p in parts if p.strip()]
+
+
+def _strip_leading_reported(text: str) -> str:
+    return _re_mod.sub(r"^(据报道|报道称|据称)[，,：: ]*", "", text or "").strip()
+
+
+def _is_weak_item_for_overview(item: DraftItem) -> bool:
+    text = f"{item.title} {item.summary} {item.evidence_note}"
+    if (item.confidence or "").lower() == "low":
+        return True
+    if (item.rumor_level or "").lower() == "rumor":
+        return True
+    return any(k in text for k in ("尚未确认", "未确认", "传闻", "被曝", "消息称", "融资", "估值"))
+
+
+def _sentence_matches_weak_item(sentence: str, weak_items: List[DraftItem]) -> bool:
+    for item in weak_items:
+        title = _strip_item_number(item.title)
+        anchors = [
+            token for token in _re_mod.split(r"[\s，,。；;：:、]+", title)
+            if _is_distinct_weak_anchor(token)
+        ]
+        if any(anchor and anchor in sentence for anchor in anchors[:5]):
+            return True
+    return False
+
+
+def _looks_like_weak_sentence(sentence: str) -> bool:
+    return any(k in sentence for k in ("据报道", "报道称", "据称", "消息称", "被曝", "尚未确认", "未确认", "传闻"))
 
 
 def _is_distinct_weak_anchor(token: str) -> bool:

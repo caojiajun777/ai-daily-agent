@@ -299,6 +299,55 @@ def test_writer_localized_titles_preserve_decimal_versions(tmp_path):
     assert "GPT-5.5" in titles[2]
 
 
+def test_writer_repairs_hard_truncated_product_titles(tmp_path):
+    valid = json.dumps(
+        {
+            "date": "2026-05-09",
+            "title": "T",
+            "sections": [
+                {"heading": "要闻", "items": [
+                    {
+                        "title": "#1 Google I/O 2026 发布 Gemini 3.5 系列和 Antigravit",
+                        "one_liner": "Google I/O 2026 发布 Gemini 3.5 系列和 Antigravity 2.0 智能体平台。",
+                        "summary": "Google I/O 2026 发布 Gemini 3.5 系列和 Antigravity 2.0 智能体平台。",
+                        "url": "https://example.com/io",
+                        "source": "src",
+                    },
+                    {
+                        "title": "#2 阿里 Qwen3.7-Max 自主运行 35 小时优化芯片代码，匹配 Claude Op",
+                        "one_liner": "阿里 Qwen3.7-Max 自主运行 35 小时优化芯片代码，匹配 Claude Opus 4.6。",
+                        "summary": "阿里 Qwen3.7-Max 自主运行 35 小时优化芯片代码，匹配 Claude Opus 4.6。",
+                        "url": "https://example.com/qwen",
+                        "source": "src",
+                    },
+                ]},
+            ],
+        },
+        ensure_ascii=False,
+    )
+    provider = _provider_emitting(valid)
+    tracer = Tracer(str(tmp_path / "t.jsonl"), run_id="r")
+    budget = BudgetTracker(100_000, 10_000, 10)
+
+    draft = write_draft(
+        provider=provider,
+        items=[],
+        date="2026-05-09",
+        system_prompt="s",
+        user_template="d={date} m={max_items} i={items_json}",
+        max_items=5,
+        tracer=tracer,
+        budget=budget,
+        complete_with_items=True,
+    )
+
+    titles = [item.title for item in draft.sections[0].items]
+    assert titles[0] == "#1 Google I/O 2026 发布 Gemini 3.5 与 Antigravity 2.0"
+    assert titles[1] == "#2 阿里 Qwen3.7-Max 自主运行 35 小时优化芯片代码"
+    assert "Antigravity 2.0" in titles[0]
+    assert "Claude Op" not in titles[1]
+
+
 def test_overview_marks_forward_signals_as_reported(tmp_path):
     valid = json.dumps(
         {
@@ -407,6 +456,102 @@ def test_overview_does_not_mark_confirmed_story_for_shared_company_name(tmp_path
     )
 
     assert draft.overview == "DeepSeek-V4-Pro API 永久降价。"
+
+
+def test_overview_scopes_reported_qualifier_to_weak_sentence(tmp_path):
+    valid = json.dumps(
+        {
+            "date": "2026-05-09",
+            "title": "T",
+            "overview": (
+                "据报道，Google I/O 发布 Gemini 3.5 与 Antigravity 2.0。"
+                "DeepSeek-V4-Pro API 永久降价。"
+                "Anthropic 被曝最快下周完成超 300 亿美元融资。"
+            ),
+            "sections": [
+                {"heading": "要闻", "items": [
+                    {
+                        "title": "#1 Google I/O 发布 Gemini 3.5 与 Antigravity 2.0",
+                        "summary": "Google 官方发布。",
+                        "url": "https://example.com/io",
+                        "source": "src",
+                        "confidence": "high",
+                        "rumor_level": "confirmed",
+                    },
+                    {
+                        "title": "#2 DeepSeek-V4-Pro API 永久降价",
+                        "summary": "DeepSeek 官方定价页更新。",
+                        "url": "https://example.com/pricing",
+                        "source": "src",
+                        "confidence": "high",
+                        "rumor_level": "confirmed",
+                    },
+                ]},
+                {"heading": "前瞻与传闻", "items": [
+                    {
+                        "title": "#3 消息称 Anthropic 完成超 300 亿美元融资",
+                        "summary": "消息尚未获官方确认。",
+                        "url": "https://example.com/anthropic",
+                        "source": "src",
+                        "confidence": "low",
+                        "rumor_level": "rumor",
+                        "evidence_note": "媒体报道，尚未获官方确认",
+                    }
+                ]},
+            ],
+        },
+        ensure_ascii=False,
+    )
+    provider = _provider_emitting(valid)
+    tracer = Tracer(str(tmp_path / "t.jsonl"), run_id="r")
+    budget = BudgetTracker(100_000, 10_000, 10)
+
+    draft = write_draft(
+        provider=provider,
+        items=[],
+        date="2026-05-09",
+        system_prompt="s",
+        user_template="d={date} m={max_items} i={items_json}",
+        max_items=5,
+        tracer=tracer,
+        budget=budget,
+        complete_with_items=True,
+    )
+
+    assert draft.overview.startswith("Google I/O 发布")
+    assert "DeepSeek-V4-Pro API 永久降价" in draft.overview
+    assert "据报道，Google" not in draft.overview
+    assert "Anthropic 被曝" in draft.overview
+
+
+def test_render_markdown_softens_unsupported_price_comparisons():
+    draft = Draft(
+        date="2026-05-09",
+        title="T",
+        overview="DeepSeek-V4-Pro API 永久降价，输出价格仅为 GPT-5.5 的 1/34。",
+        sections=[
+            DraftSection(heading="要闻", items=[
+                DraftItem(
+                    title="#1 DeepSeek-V4-Pro API 永久降价",
+                    one_liner="DeepSeek-V4-Pro API 永久降价，输出价格仅为 GPT-5.5 的 1/34。",
+                    summary="DeepSeek 官方定价页更新。",
+                    body_paragraphs=[
+                        "这一永久降价策略使 DeepSeek-V4-Pro 的输出价格比 GPT-5.5 低 34 倍以上，对成本敏感应用有吸引力。"
+                    ],
+                    highlights=["输出价格比 GPT-5.5 低 34 倍"],
+                    url="https://example.com/pricing",
+                    source="deepseek_pricing",
+                    evidence_note="官方定价页明确显示价格；竞品对比需按公开价格口径估算",
+                )
+            ])
+        ],
+    )
+
+    md = render_markdown(draft)
+
+    assert "输出价格仅为 GPT-5.5" not in md
+    assert "输出价格比 GPT-5.5 低 34 倍" not in md
+    assert "按公开价格口径估算" in md
 
 
 def test_empty_sections_are_pruned_when_completing_with_curated(tmp_path):

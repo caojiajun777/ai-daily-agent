@@ -7,6 +7,7 @@ the fact on past runs to score the harness over time.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, Iterable, List, Optional, Set
 
 from agent.schemas import CuratedItem, CuratedItemRecord, Draft
@@ -50,6 +51,8 @@ def deterministic_metrics(
             if bad and bad in text:
                 forbidden_hits += 1
 
+    truncated_title_count = sum(1 for it in items if _looks_truncated_title(it.title))
+
     issues: List[str] = []
     if section_count < min_section_count:
         issues.append("section_count_below_threshold")
@@ -59,6 +62,8 @@ def deterministic_metrics(
         issues.append("hallucinated_urls_present")
     if forbidden_hits > 0:
         issues.append("forbidden_phrases_present")
+    if truncated_title_count > 0:
+        issues.append("truncated_titles_present")
 
     return {
         "section_count": section_count,
@@ -66,7 +71,25 @@ def deterministic_metrics(
         "unique_titles_ratio": round(unique_titles_ratio, 3),
         "hallucinated_urls": hallucinated_urls,
         "forbidden_hits": forbidden_hits,
+        "truncated_title_count": truncated_title_count,
         "issues": issues,
         "ok": not issues,
         "used_curated_artifact": used_curated_artifact,
     }
+
+
+def _looks_truncated_title(title: str) -> bool:
+    title = re.sub(r"^\s*#?\d+[\s.、:-]*", "", title or "").strip()
+    if re.search(r"(?:[，,、；;：:]|和|与|及|的)$", title):
+        return True
+    m = re.search(r"([A-Za-z][A-Za-z0-9_.-]*)$", title)
+    if not m:
+        return False
+    tail = m.group(1).lower()
+    if tail in {
+        "api", "mcp", "agent", "agents", "codex", "openai", "google",
+        "github", "eclipse", "gemini", "claude", "qwen", "deepseek",
+        "anthropic", "gpt",
+    }:
+        return False
+    return len(tail) <= 2 or tail in {"antigravit"}

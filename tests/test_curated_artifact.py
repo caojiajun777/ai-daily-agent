@@ -254,6 +254,35 @@ def test_eval_fallback_without_curated_records():
     assert metrics["used_curated_artifact"] is False
 
 
+def test_eval_flags_hard_truncated_titles():
+    draft = Draft(
+        date="2026-05-09",
+        title="T",
+        sections=[
+            DraftSection(heading="要闻", items=[
+                DraftItem(
+                    title="#1 Google I/O 发布 Gemini 3.5 和 Antigravit",
+                    summary="summary",
+                    url="https://example.com/io",
+                    source="src",
+                ),
+                DraftItem(
+                    title="#2 阿里 Qwen3.7-Max 匹配 Claude Op",
+                    summary="summary",
+                    url="https://example.com/qwen",
+                    source="src",
+                ),
+            ])
+        ],
+    )
+
+    metrics = deterministic_metrics(draft=draft, curated=[], min_section_count=1)
+
+    assert metrics["truncated_title_count"] == 2
+    assert "truncated_titles_present" in metrics["issues"]
+    assert metrics["ok"] is False
+
+
 # --------------------------------------------------------------------------- #
 # 4. Dedup and raw_item_id
 # --------------------------------------------------------------------------- #
