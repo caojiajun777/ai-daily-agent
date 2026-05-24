@@ -1,6 +1,6 @@
 name: Agent — Daily Run & Publish
 
-# Runs every day at 10:00 Beijing time (UTC 02:00), then waits until
+# Runs every day at 10:17 Beijing time (UTC 02:17), then waits until
 # 12:00 Beijing time before publishing. This gives the LLM pipeline time
 # to collect, curate, repair, and pass gates while keeping the public
 # issue/email release at noon.
@@ -20,7 +20,7 @@ name: Agent — Daily Run & Publish
 
 on:
   schedule:
-    - cron: "0 2 * * *"   # 10:00 CST = 02:00 UTC; publish waits until 12:00 CST
+    - cron: "17 2 * * *"  # 10:17 CST = 02:17 UTC; avoid top-of-hour schedule drops
   workflow_dispatch:
     inputs:
       date:
