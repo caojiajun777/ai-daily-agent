@@ -7,7 +7,8 @@ Key clustering signals (in priority order):
   1. Exact title hash match (strongest — same article scraped/re-shared)
   2. Canonical URL match (tracking params stripped)
   3. Normalized title match (stemmed, de-branded)
-  4. difflib title similarity ≥ 0.75
+  4. Model-name anchor match (shared versioned model reference)
+  5. difflib title similarity ≥ 0.68
 """
 
 from __future__ import annotations
@@ -32,6 +33,49 @@ _SIMILARITY_THRESHOLD = 0.68
 _MARKETING_WORDS = {"exclusive", "独家", "重磅", "炸裂", "震惊", "突发",
                     "must-read", "breaking", "bombshell", "game-changer",
                     "颠覆", "碾压", "完爆", "吊打"}
+
+# Model families for anchor-based clustering. When two titles reference the
+# same model+version (e.g. "Claude Opus 4.8"), they are merged even when the
+# full-title similarity falls below _SIMILARITY_THRESHOLD.  This prevents
+# "X announces Y 4.8" and "Y 4.8 is generally available for Z" from being
+# treated as independent stories.
+_MODEL_FAMILIES = [
+    # Anthropic
+    "claude opus", "claude sonnet", "claude haiku",
+    # OpenAI
+    "gpt", "chatgpt", "o1", "o3", "o4", "codex", "dall-e", "sora",
+    # Google
+    "gemini flash", "gemini spark", "gemini pro", "gemini ultra", "gemini nano",
+    "veo", "imagen",
+    # Meta
+    "llama",
+    # Chinese labs
+    "deepseek", "qwen", "step",
+    # Other western labs
+    "mistral large", "mistral small", "grok",
+    # Image / video generation
+    "midjourney", "stable diffusion", "controlfoley",
+]
+
+_MODEL_ANCHOR_RE_CACHE: Dict[str, re.Pattern] = {}
+
+
+def _extract_model_anchors(title: str) -> "set[str]":
+    """Return ``{family:major.minor, ...}`` anchors found in *title*."""
+    title_lower = title.lower()
+    anchors: set[str] = set()
+    for family in _MODEL_FAMILIES:
+        pat = _MODEL_ANCHOR_RE_CACHE.get(family)
+        if pat is None:
+            pat = re.compile(
+                r'\b' + re.escape(family) + r'[\s-]*(\d+)\.(\d+)(?:\.(\d+))?',
+                re.IGNORECASE,
+            )
+            _MODEL_ANCHOR_RE_CACHE[family] = pat
+        for m in pat.finditer(title_lower):
+            major, minor = m.group(1), m.group(2)
+            anchors.add(f"{family}:{major}.{minor}")
+    return anchors
 
 
 @dataclass
@@ -93,6 +137,19 @@ def cluster_items(items: List[RawItem]) -> List[EventCluster]:
                 if sim >= _SIMILARITY_THRESHOLD:
                     # Prevent merging distinct product versions (e.g. Gemini 2.5 vs 3.5).
                     if _same_product_version(norm_title, cluster_norm):
+                        idx = i
+                        break
+
+        if idx is None:
+            # Model-name anchor check: when two items reference the same
+            # versioned model (e.g. both mention "Claude Opus 4.8"), merge
+            # them even if the surrounding context differs enough to fall
+            # below the fuzzy similarity threshold.  This handles the
+            # "X releases Y 4.8" vs "Y 4.8 available on Z" case.
+            anchors = _extract_model_anchors(it.title)
+            if anchors:
+                for i, cluster in enumerate(clusters):
+                    if anchors & _extract_model_anchors(cluster.canonical_title):
                         idx = i
                         break
 

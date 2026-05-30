@@ -3,7 +3,7 @@
 import json
 import os
 import pytest
-from agent.agents.event_clusterer import cluster_items, EventCluster
+from agent.agents.event_clusterer import cluster_items, EventCluster, _extract_model_anchors
 from agent.agents.event_scorer import score_events
 from agent.agents.research_editor import (
     ResearchEditorOutput, EditorialDecision, SourceUse,
@@ -59,6 +59,36 @@ def test_cluster_official_wins_primary():
     clusters = cluster_items(items)
     assert len(clusters) == 1
     assert "openai_news" in clusters[0].source_names
+
+
+def test_cluster_merges_same_model_anchor_despite_different_context():
+    """Model announcement + platform availability link should merge."""
+    items = [
+        make_item("anthropic_news", "https://www.anthropic.com/news/claude-opus-4-8",
+                  "Introducing Claude Opus 4.8", stype="sitemap"),
+        make_item("github_copilot_changelog",
+                  "https://github.blog/changelog/2026-05-28-claude-opus-4-8",
+                  "Claude Opus 4.8 is generally available for GitHub Copilot",
+                  stype="rss"),
+    ]
+    clusters = cluster_items(items)
+    assert len(clusters) == 1, f"Expected 1 cluster, got {len(clusters)}"
+    assert clusters[0].source_count == 2
+    # Anthropic official source should be canonical
+    assert "anthropic_news" in clusters[0].source_names
+    assert "github_copilot_changelog" in clusters[0].source_names
+
+
+def test_cluster_keeps_different_model_versions_separate():
+    """Gemini 2.5 Flash vs Gemini 3.5 Flash should NOT merge."""
+    items = [
+        make_item("google_blog", "https://blog.google/gemini-2-5-flash",
+                  "Introducing Gemini 2.5 Flash", stype="rss"),
+        make_item("google_blog", "https://blog.google/gemini-3-5-flash",
+                  "Introducing Gemini 3.5 Flash", stype="rss"),
+    ]
+    clusters = cluster_items(items)
+    assert len(clusters) == 2, f"Expected 2 clusters, got {len(clusters)}"
 
 
 # Rule Scoring
