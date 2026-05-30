@@ -724,7 +724,6 @@ def run_pipeline(
         critique: CritiqueResult = deterministic_critique(
             draft,
             curated,
-            min_section_count=int(eval_cfg.get("min_section_count", 3)),
             forbid_phrases=eval_cfg.get("forbid_phrases", []),
         )
         s.meta["verdict"] = critique.verdict
@@ -773,7 +772,6 @@ def run_pipeline(
             min_unique_titles_ratio=float(
                 eval_cfg.get("min_unique_titles_ratio", 0.8)
             ),
-            min_section_count=int(eval_cfg.get("min_section_count", 3)),
             forbid_phrases=eval_cfg.get("forbid_phrases", []),
             curated_records=curated_records,
         )
@@ -896,7 +894,6 @@ def run_pipeline(
             _re_critique = deterministic_critique(
                 draft,
                 curated,
-                min_section_count=int(eval_cfg.get("min_section_count", 3)),
                 forbid_phrases=eval_cfg.get("forbid_phrases", []),
             )
             tracer.log(

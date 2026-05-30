@@ -63,6 +63,16 @@ def build_source(spec: Dict[str, Any]) -> SourceAdapter:
             url=spec["url"],
             timeout_sec=float(spec.get("timeout_sec", spec.get("fetch_timeout_sec", 12.0))),
         )
+    if t == "sitemap":
+        from agent.sources.sitemap import SitemapAdapter
+
+        return SitemapAdapter(
+            source_id=spec["id"],
+            url=spec["url"],
+            include_path=str(spec.get("include_path", "")),
+            timeout_sec=float(spec.get("timeout_sec", spec.get("fetch_timeout_sec", 12.0))),
+            fetch_pages=bool(spec.get("fetch_pages", True)),
+        )
     if t == "arxiv":
         from agent.sources.arxiv_adapter import ArxivAdapter
 
