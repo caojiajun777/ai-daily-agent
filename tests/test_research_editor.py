@@ -562,6 +562,63 @@ def test_final_selector_normalizes_model_release_sections():
     assert meta["section_normalized_count"] == 1
 
 
+def test_official_model_release_beats_platform_access_and_merges_link():
+    official = EventCluster(
+        event_id="evt_claude_release",
+        canonical_title="Claude Opus 4.8 发布：编码与 Agent 能力全面升级",
+        primary_url="https://www.anthropic.com/news/claude-opus-4-8",
+        source_urls=["https://www.anthropic.com/news/claude-opus-4-8"],
+        source_names=["anthropic_news"],
+        source_types=["rss"],
+        source_count=1,
+        primary_source_tier="tier_0_core_evidence",
+        primary_evidence_type="official_release",
+        primary_confidence="high",
+        summary="Anthropic 发布 Claude Opus 4.8 模型，编码、智能体和推理能力提升。",
+        rule_score=0.8,
+    )
+    platform = EventCluster(
+        event_id="evt_claude_copilot",
+        canonical_title="Claude Opus 4.8 is generally available for GitHub Copilot",
+        primary_url="https://github.blog/changelog/2026-05-28-claude-opus-4-8-is-generally-available-for-github-copilot",
+        source_urls=[
+            "https://github.blog/changelog/2026-05-28-claude-opus-4-8-is-generally-available-for-github-copilot"
+        ],
+        source_names=["github_copilot_changelog"],
+        source_types=["rss"],
+        source_count=1,
+        primary_source_tier="tier_0_core_evidence",
+        primary_evidence_type="official_release",
+        primary_confidence="high",
+        summary="GitHub Copilot 集成 Claude Opus 4.8。",
+        rule_score=0.9,
+    )
+    output = ResearchEditorOutput(selected=[
+        EditorialDecision(
+            event_id="evt_claude_copilot", decision="select",
+            priority="must_include", section="开发生态",
+            evidence_level="official", novelty="new_event",
+            reader_utility="high", why_it_matters="platform",
+            writing_angle="platform", risk_level="low",
+            sources_to_use=[SourceUse(url=platform.primary_url)],
+        )
+    ], rejected=[])
+
+    items, _recs, meta = select_final_items(
+        editor_output=output,
+        events=[platform, official],
+        min_items=1,
+        max_items=3,
+        min_papers=0,
+    )
+
+    assert len(items) == 1
+    assert items[0].url == official.primary_url
+    assert items[0].section == "模型发布"
+    assert platform.primary_url in items[0].supporting_urls
+    assert meta["official_model_release_promoted_count"] >= 1
+
+
 def test_final_selector_normalizes_agent_tool_sections():
     event = EventCluster(
         event_id="evt_datasette",

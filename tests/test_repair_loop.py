@@ -204,6 +204,80 @@ def test_high_duplicate_repair_attempted(tmp_path):
     assert "https://a.com/10" not in all_urls
 
 
+def test_repair_protects_official_model_release_and_merges_access_link(tmp_path):
+    official_url = "https://www.anthropic.com/news/claude-opus-4-8"
+    platform_url = (
+        "https://github.blog/changelog/2026-05-28-claude-opus-4-8-is-generally-available-for-github-copilot"
+    )
+    draft = Draft(
+        date=DATE,
+        title=f"AI 日报 {DATE}",
+        sections=[
+            DraftSection(heading="模型发布", items=[
+                DraftItem(
+                    title="#1 Claude Opus 4.8 发布：编码与 Agent 能力全面升级",
+                    summary="Anthropic 发布 Claude Opus 4.8 模型，编码、智能体和推理能力提升。",
+                    url=official_url,
+                    source="Anthropic",
+                    source_tier="tier_0_core_evidence",
+                    evidence_type="official_release",
+                    item_type="model",
+                )
+            ]),
+            DraftSection(heading="开发生态", items=[
+                DraftItem(
+                    title="#2 Claude Opus 4.8 正式登陆 GitHub Copilot",
+                    summary="GitHub Copilot 集成 Claude Opus 4.8。",
+                    url=platform_url,
+                    source="github_copilot_changelog",
+                    source_tier="tier_0_core_evidence",
+                    evidence_type="official_release",
+                )
+            ]),
+        ],
+    )
+    sem = _sem_report([
+        SemanticDuplicate(
+            item_a_id="#1", item_b_id="#2",
+            item_a_title="#1 Claude Opus 4.8 发布：编码与 Agent 能力全面升级",
+            item_b_title="#2 Claude Opus 4.8 正式登陆 GitHub Copilot",
+            reason="同一模型发布与平台接入高度重叠",
+            severity="high",
+        )
+    ])
+    records = _curated_records([official_url, platform_url])
+    call_count = [0]
+
+    def responder(messages: List[LLMMessage]) -> str:
+        call_count[0] += 1
+        return json.dumps({"actions": [{
+            "section": "模型发布",
+            "removed_title": "#1 Claude Opus 4.8 发布：编码与 Agent 能力全面升级",
+            "removed_url": official_url,
+            "replacement_url": None,
+            "replacement_title": None,
+            "reason": "bad suggestion",
+        }]})
+
+    repaired, report = repair_draft(
+        draft=draft,
+        sem_report=sem,
+        curated_records=records,
+        provider=MockLLMProvider(model="mock-repair", responder=responder),
+        date=DATE,
+        run_id=RUN_ID,
+        tracer=_tracer(tmp_path),
+        budget=_budget(),
+    )
+
+    assert call_count[0] == 0
+    assert report.succeeded is True
+    assert report.actions[0].removed_url == platform_url
+    all_items = [item for sec in repaired.sections for item in sec.items]
+    assert [item.url for item in all_items] == [official_url]
+    assert platform_url in all_items[0].related_links
+
+
 # --------------------------------------------------------------------------- #
 # 4. repaired draft passes critic
 # --------------------------------------------------------------------------- #

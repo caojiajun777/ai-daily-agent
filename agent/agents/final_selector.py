@@ -98,6 +98,10 @@ def select_final_items(
                     SourceUse(url=evt.source_urls[0], role="primary"),
                 ]
 
+    promoted = _promote_official_model_release_decisions(all_decisions, events)
+    if promoted:
+        meta["official_model_release_promoted_count"] = promoted
+
     normalized_sections = _normalize_decision_sections(all_decisions, event_map)
     if normalized_sections:
         meta["section_normalized_count"] = normalized_sections
@@ -108,6 +112,7 @@ def select_final_items(
         all_decisions.keys(),
         key=lambda eid: (
             priority_order.get(all_decisions[eid].priority, 2),
+            0 if _is_official_model_release_event(event_map.get(eid)) else 1,
             -event_map[eid].rule_score,
         ),
     )
@@ -196,6 +201,8 @@ def select_final_items(
 
     # First pass: must_include always in.
     for eid in sorted_ids:
+        if eid in final_ids:
+            continue
         d = all_decisions[eid]
         if d.priority == "must_include":
             evt = event_map.get(eid)
@@ -574,6 +581,11 @@ def _normalize_decision_sections(
         evt = event_map.get(event_id)
         if evt is None:
             continue
+        if _is_official_model_release_event(evt):
+            if dec.section != "要闻" and dec.section != "模型发布":
+                dec.section = "模型发布"
+                changed += 1
+            continue
         if dec.section == "要闻":
             if _can_stay_headline(evt):
                 continue
@@ -590,6 +602,62 @@ def _normalize_decision_sections(
             dec.section = guessed
             changed += 1
     return changed
+
+
+def _promote_official_model_release_decisions(
+    decisions: Dict[str, EditorialDecision],
+    events: List[EventCluster],
+) -> int:
+    """Prefer the model maker's own release over access/platform stories."""
+    event_map = {e.event_id: e for e in events}
+    priority_rank = {"must_include": 0, "high": 1, "medium": 2, "low": 3}
+    selected_story_priority: Dict[str, str] = {}
+    for event_id, dec in decisions.items():
+        if dec.decision != "select":
+            continue
+        evt = event_map.get(event_id)
+        key = _story_key(evt)
+        if not key:
+            continue
+        current = selected_story_priority.get(key)
+        if current is None or priority_rank.get(dec.priority, 2) < priority_rank.get(current, 2):
+            selected_story_priority[key] = dec.priority
+
+    promoted = 0
+    for evt in events:
+        key = _story_key(evt)
+        if not key or key not in selected_story_priority:
+            continue
+        if not _is_official_model_release_event(evt):
+            continue
+        desired = selected_story_priority[key]
+        if priority_rank.get(desired, 2) > priority_rank["high"]:
+            desired = "high"
+        existing = decisions.get(evt.event_id)
+        if existing is None:
+            sources = []
+            if evt.primary_url:
+                from agent.agents.research_editor import SourceUse
+                sources = [SourceUse(url=evt.primary_url, role="primary")]
+            decisions[evt.event_id] = EditorialDecision(
+                event_id=evt.event_id,
+                decision="select",
+                priority=desired,
+                section="模型发布",
+                evidence_level="official",
+                novelty="new_event",
+                reader_utility="high",
+                why_it_matters=_fallback_why_it_matters(evt),
+                writing_angle=_fallback_writing_angle(evt, "模型发布"),
+                risk_level="low",
+                sources_to_use=sources,
+            )
+            promoted += 1
+            continue
+        if priority_rank.get(existing.priority, 2) > priority_rank.get(desired, 1):
+            existing.priority = desired
+            promoted += 1
+    return promoted
 
 
 def _normalize_section(section: str) -> str:
@@ -635,6 +703,9 @@ def _story_key(evt: Optional[EventCluster]) -> str:
         return "google_io_2026"
     if _is_google_ai_edge_story(text):
         return "google_ai_edge"
+    model_key = _model_story_key(text)
+    if model_key:
+        return model_key
     patterns = [
         r"\bqwen\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
         r"\bgpt-\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
@@ -647,6 +718,93 @@ def _story_key(evt: Optional[EventCluster]) -> str:
         if m:
             return m.group(0).replace(" ", "")
     return ""
+
+
+def _model_story_key(text: str) -> str:
+    patterns = [
+        r"\bclaude\s+(?:opus|sonnet|haiku)\s+\d+(?:\.\d+)*\b",
+        r"\bclaude\s*\d+(?:\.\d+)*(?:\s*(?:opus|sonnet|haiku))?\b",
+        r"\bgpt[-\s]?\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
+        r"\bgemini\s*\d+(?:\.\d+)*(?:\s*(?:pro|flash|ultra|nano))?\b",
+        r"\bqwen\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
+        r"\bdeepseek[-\s]?[vr]?\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
+        r"\bminimax\s*m\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
+        r"\bstep\s*\d+(?:\.\d+)*(?:\s*flash)?\b",
+        r"\bstepaudio\s*\d+(?:\.\d+)*(?:\s*realtime)?\b",
+        r"\bglm[-\s]?\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
+        r"\bhunyuan[-\s]?\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
+        r"\bkimi\s*k?\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
+    ]
+    for pattern in patterns:
+        m = re.search(pattern, text)
+        if m:
+            return re.sub(r"\s+", "", m.group(0).lower())
+    return ""
+
+
+def _is_official_model_release_event(evt: Optional[EventCluster]) -> bool:
+    if evt is None:
+        return False
+    text = f"{evt.canonical_title} {evt.summary}".lower()
+    if not _model_story_key(text):
+        return False
+    if not _has_official_model_provider_source(evt):
+        return False
+    if _is_platform_access_story(text):
+        return False
+    release_terms = (
+        "release", "released", "launch", "launched", "introducing",
+        "introduced", "announce", "announced", "latest", "new", "live",
+        "flagship", "发布", "推出", "上线", "宣布", "开源", "旗舰", "最新",
+    )
+    capability_terms = (
+        "model", "models", "模型", "benchmark", "benchmarks", "coding",
+        "reasoning", "agent", "推理", "基准", "能力", "智能体", "编码",
+    )
+    return _contains_any(text, release_terms) and _contains_any(text, capability_terms)
+
+
+def _is_platform_access_story(text: str) -> bool:
+    access_terms = (
+        "github copilot", "copilot", "openrouter", "vertex ai", "bedrock",
+        "azure ai", "available for", "integrated into", "integration",
+        "登陆", "接入", "集成至", "集成到",
+    )
+    return _contains_any(text, access_terms)
+
+
+def _contains_any(text: str, terms: Tuple[str, ...]) -> bool:
+    for term in terms:
+        if term in text:
+            return True
+    return False
+
+
+def _has_official_model_provider_source(evt: EventCluster) -> bool:
+    names = {n.lower() for n in evt.source_names}
+    if evt.primary_source_name:
+        names.add(evt.primary_source_name.lower())
+    urls = " ".join([evt.primary_url, *evt.source_urls]).lower()
+    provider_ids = {
+        "openai_news", "x_openai", "anthropic_news", "x_anthropic",
+        "x_anthropicai", "google_ai_blog", "google_deepmind_blog",
+        "x_googledeepmind", "meta_ai_blog", "x_metaai", "x_aiatmeta",
+        "mistral_ai", "x_mistralai", "huggingface_blog", "x_qwen",
+        "x_alibaba_qwen", "qwen_github_releases", "x_deepseek",
+        "x_deepseek_ai", "deepseek_github_releases", "x_tencent_hunyuan",
+        "x_stepfun", "x_minimax", "x_zhipu", "x_moonshot",
+    }
+    provider_markers = (
+        "openai.com/index/", "openai.com/news/", "anthropic.com/news/",
+        "claude.com/blog/", "deepmind.google/", "blog.google/technology/ai/",
+        "ai.meta.com/blog/", "mistral.ai/news/", "huggingface.co/blog/",
+        "github.com/qwenlm/", "github.com/deepseek-ai/",
+        "x.com/openai/", "x.com/anthropicai/", "x.com/googledeepmind/",
+        "x.com/aiatmeta/", "x.com/mistralai/", "x.com/alibaba_qwen/",
+        "x.com/deepseek_ai/", "x.com/tencenthunyuan/", "x.com/stepfun_ai/",
+        "x.com/minimax_ai/", "x.com/chatglm/", "x.com/moonshot",
+    )
+    return bool(names & provider_ids) or any(marker in urls for marker in provider_markers)
 
 
 def _is_google_io_story(text: str) -> bool:
@@ -738,23 +896,29 @@ def _is_official_primary(source_name: str, url: str) -> bool:
         "openai_news", "anthropic_news", "google_ai_blog",
         "google_developers_blog", "google_deepmind_blog", "meta_ai_blog",
         "microsoft_ai_blog", "huggingface_blog", "ollama_releases",
-        "x_openai", "x_anthropicai", "x_alibaba_qwen", "x_qwen",
+        "x_openai", "x_anthropic", "x_anthropicai", "x_alibaba_qwen", "x_qwen",
         "x_tencent_hunyuan", "x_deepseek_ai", "x_googledeepmind",
-        "x_stepfun",
+        "x_deepseek", "x_stepfun", "x_minimax", "x_mistralai",
     }
     official_url_markers = (
         "openai.com/index/",
+        "openai.com/news/",
         "anthropic.com/news/",
+        "claude.com/blog/",
         "developers.googleblog.com/",
         "blog.google/technology/ai/",
         "deepmind.google/",
         "ai.meta.com/blog/",
+        "mistral.ai/news/",
         "github.com/ollama/ollama/releases/",
         "github.blog/changelog/",
         "x.com/openai/",
+        "x.com/anthropicai/",
         "x.com/alibaba_qwen/",
         "x.com/tencenthunyuan/",
+        "x.com/deepseek_ai/",
         "x.com/stepfun_ai/",
+        "x.com/minimax_ai/",
     )
     return s in official_source_ids or any(marker in u for marker in official_url_markers)
 

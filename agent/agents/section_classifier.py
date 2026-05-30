@@ -104,23 +104,29 @@ def _is_official_release_source(evt: EventCluster) -> bool:
         "openai_news", "anthropic_news", "google_ai_blog",
         "google_developers_blog", "google_deepmind_blog", "meta_ai_blog",
         "microsoft_ai_blog", "huggingface_blog", "ollama_releases",
-        "x_openai", "x_anthropicai", "x_alibaba_qwen", "x_qwen",
+        "x_openai", "x_anthropic", "x_anthropicai", "x_alibaba_qwen", "x_qwen",
         "x_tencent_hunyuan", "x_deepseek_ai", "x_googledeepmind",
-        "x_stepfun",
+        "x_deepseek", "x_stepfun", "x_minimax", "x_mistralai",
     }
     official_url_markers = (
         "openai.com/index/",
+        "openai.com/news/",
         "anthropic.com/news/",
+        "claude.com/blog/",
         "developers.googleblog.com/",
         "blog.google/technology/ai/",
         "deepmind.google/",
         "ai.meta.com/blog/",
+        "mistral.ai/news/",
         "github.com/ollama/ollama/releases/",
         "github.blog/changelog/",
         "x.com/openai/",
+        "x.com/anthropicai/",
         "x.com/alibaba_qwen/",
         "x.com/tencenthunyuan/",
+        "x.com/deepseek_ai/",
         "x.com/stepfun_ai/",
+        "x.com/minimax_ai/",
     )
     return bool(names & official_source_ids) or any(marker in urls for marker in official_url_markers)
 

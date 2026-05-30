@@ -129,6 +129,217 @@ def _unused_candidates(
     ]
 
 
+def _item_id(item: DraftItem) -> str:
+    m = re.match(r"^(#\d+)\b", item.title or "")
+    return m.group(1) if m else ""
+
+
+def _draft_refs(draft: Draft) -> List[Dict[str, Any]]:
+    refs: List[Dict[str, Any]] = []
+    for sec in draft.sections:
+        for item in sec.items:
+            refs.append({
+                "id": _item_id(item),
+                "section": sec.heading,
+                "item": item,
+            })
+    return refs
+
+
+def _find_dup_ref(
+    refs: List[Dict[str, Any]],
+    item_id: str,
+    item_title: str,
+) -> Optional[Dict[str, Any]]:
+    if item_id:
+        for ref in refs:
+            if ref["id"] == item_id:
+                return ref
+    needle = _strip_item_number(item_title).lower()
+    for ref in refs:
+        title = _strip_item_number(ref["item"].title).lower()
+        if needle and (needle == title or needle in title or title in needle):
+            return ref
+    return None
+
+
+def _strip_item_number(title: str) -> str:
+    return re.sub(r"^#\d+\s*", "", title or "").strip()
+
+
+def _protected_model_release_actions(
+    blocking: List[SemanticDuplicate],
+    draft: Draft,
+) -> Tuple[List[Tuple[RepairAction, str]], List[SemanticDuplicate]]:
+    """Build deterministic repairs that preserve official model releases.
+
+    Returns (actions_with_keep_url, remaining_duplicates). The action removes
+    the less authoritative duplicate; keep_url receives the removed URL as a
+    related link before removal.
+    """
+    refs = _draft_refs(draft)
+    protected: List[Tuple[RepairAction, str]] = []
+    remaining: List[SemanticDuplicate] = []
+
+    for dup in blocking:
+        a = _find_dup_ref(refs, dup.item_a_id, dup.item_a_title)
+        b = _find_dup_ref(refs, dup.item_b_id, dup.item_b_title)
+        if not a or not b:
+            remaining.append(dup)
+            continue
+        a_item: DraftItem = a["item"]
+        b_item: DraftItem = b["item"]
+        a_protected = _is_protected_official_model_release_item(a_item, a["section"])
+        b_protected = _is_protected_official_model_release_item(b_item, b["section"])
+        if a_protected == b_protected:
+            remaining.append(dup)
+            continue
+
+        keep = a if a_protected else b
+        drop = b if a_protected else a
+        keep_item: DraftItem = keep["item"]
+        drop_item: DraftItem = drop["item"]
+        action = RepairAction(
+            section=drop["section"],
+            removed_title=drop_item.title,
+            removed_url=drop_item.url,
+            replacement_url=None,
+            replacement_title=None,
+            reason=(
+                "保留官方模型发布，将同模型的平台接入或二次报道合并为相关链接。"
+            ),
+        )
+        protected.append((action, keep_item.url))
+
+    return protected, remaining
+
+
+def _merge_related_links_for_kept_items(
+    draft: Draft,
+    protected_actions: List[Tuple[RepairAction, str]],
+) -> Draft:
+    if not protected_actions:
+        return draft
+    links_by_keep_url: Dict[str, List[str]] = {}
+    for action, keep_url in protected_actions:
+        if not keep_url or not action.removed_url:
+            continue
+        links_by_keep_url.setdefault(keep_url, []).append(action.removed_url)
+
+    new_sections: List[DraftSection] = []
+    for sec in draft.sections:
+        new_items: List[DraftItem] = []
+        for item in sec.items:
+            extra = links_by_keep_url.get(item.url)
+            if not extra:
+                new_items.append(item)
+                continue
+            links = _dedupe_urls([*item.related_links, *extra])
+            new_items.append(item.model_copy(update={"related_links": links[:4]}))
+        new_sections.append(DraftSection(heading=sec.heading, items=new_items))
+    return draft.model_copy(update={"sections": new_sections})
+
+
+def _dedupe_urls(urls: List[str]) -> List[str]:
+    out: List[str] = []
+    seen: Set[str] = set()
+    for url in urls:
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        out.append(url)
+    return out
+
+
+def _is_protected_official_model_release_item(item: DraftItem, section: str) -> bool:
+    text = f"{item.title} {item.summary} {' '.join(item.body_paragraphs)}".lower()
+    if not _model_story_key(text):
+        return False
+    if not _has_model_release_signal(text, section, item):
+        return False
+    if not _is_model_provider_source(item):
+        return False
+    if _is_platform_access_story(text):
+        return False
+    return True
+
+
+def _model_story_key(text: str) -> str:
+    patterns = [
+        r"\bclaude\s+(?:opus|sonnet|haiku)\s+\d+(?:\.\d+)*\b",
+        r"\bclaude\s*\d+(?:\.\d+)*(?:\s*(?:opus|sonnet|haiku))?\b",
+        r"\bgpt[-\s]?\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
+        r"\bgemini\s*\d+(?:\.\d+)*(?:\s*(?:pro|flash|ultra|nano))?\b",
+        r"\bqwen\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
+        r"\bdeepseek[-\s]?[vr]?\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
+        r"\bminimax\s*m\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
+        r"\bstep\s*\d+(?:\.\d+)*(?:\s*flash)?\b",
+        r"\bstepaudio\s*\d+(?:\.\d+)*(?:\s*realtime)?\b",
+        r"\bglm[-\s]?\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
+        r"\bhunyuan[-\s]?\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
+        r"\bkimi\s*k?\d+(?:\.\d+)*(?:-[a-z0-9]+)?\b",
+    ]
+    for pattern in patterns:
+        m = re.search(pattern, text)
+        if m:
+            return re.sub(r"\s+", "", m.group(0).lower())
+    return ""
+
+
+def _has_model_release_signal(text: str, section: str, item: DraftItem) -> bool:
+    if section == "模型发布" or item.item_type in {"model", "release"}:
+        return True
+    release_terms = (
+        "release", "released", "launch", "launched", "introducing",
+        "introduced", "announce", "announced", "latest", "new", "live",
+        "flagship", "发布", "推出", "上线", "宣布", "开源", "旗舰", "最新",
+    )
+    capability_terms = (
+        "model", "models", "模型", "benchmark", "benchmarks", "coding",
+        "reasoning", "agent", "推理", "基准", "能力", "智能体", "编码",
+    )
+    return _contains_any(text, release_terms) and _contains_any(text, capability_terms)
+
+
+def _is_platform_access_story(text: str) -> bool:
+    access_terms = (
+        "github copilot", "copilot", "openrouter", "vertex ai", "bedrock",
+        "azure ai", "available for", "integrated into", "integration",
+        "登陆", "接入", "集成至", "集成到",
+    )
+    return _contains_any(text, access_terms)
+
+
+def _contains_any(text: str, terms: Tuple[str, ...]) -> bool:
+    for term in terms:
+        if term in text:
+            return True
+    return False
+
+
+def _is_model_provider_source(item: DraftItem) -> bool:
+    source = (item.source or "").lower()
+    url = (item.url or "").lower()
+    provider_sources = {
+        "openai", "openai_news", "anthropic", "anthropic_news",
+        "google_ai_blog", "google_deepmind_blog", "meta_ai_blog",
+        "mistral", "mistral_ai", "huggingface_blog", "qwen",
+        "x_qwen", "deepseek", "x_deepseek", "minimax", "stepfun",
+        "x_stepfun", "zhipu", "moonshot",
+    }
+    provider_markers = (
+        "openai.com/index/", "openai.com/news/", "anthropic.com/news/",
+        "claude.com/blog/", "deepmind.google/", "blog.google/technology/ai/",
+        "ai.meta.com/blog/", "mistral.ai/news/", "huggingface.co/blog/",
+        "github.com/qwenlm/", "github.com/deepseek-ai/",
+        "x.com/openai/", "x.com/anthropicai/", "x.com/googledeepmind/",
+        "x.com/aiatmeta/", "x.com/mistralai/", "x.com/alibaba_qwen/",
+        "x.com/deepseek_ai/", "x.com/tencenthunyuan/", "x.com/stepfun_ai/",
+        "x.com/minimax_ai/", "x.com/chatglm/", "x.com/moonshot",
+    )
+    return source in provider_sources or any(marker in url for marker in provider_markers)
+
+
 def _renumber_draft(draft: Draft) -> Draft:
     """Re-assign global #N prefixes to all item titles."""
     counter = 0
@@ -291,6 +502,46 @@ def repair_draft(
 
     candidates = _unused_candidates(curated_records, draft)
     allowed_urls: Set[str] = {r.source_url for r in curated_records}
+    replacement_records = {r.source_url: r for r in curated_records}
+
+    deterministic_actions, remaining_blocking = _protected_model_release_actions(
+        blocking, draft
+    )
+    applied_deterministic: List[RepairAction] = []
+    if deterministic_actions:
+        draft_with_links = _merge_related_links_for_kept_items(draft, deterministic_actions)
+        repaired, applied_deterministic = apply_repair_actions(
+            draft_with_links,
+            [action for action, _keep_url in deterministic_actions],
+            allowed_urls,
+            replacement_records,
+        )
+        if applied_deterministic:
+            draft = repaired
+            blocking = remaining_blocking
+            candidates = _unused_candidates(curated_records, draft)
+            tracer.log(
+                "repair_protected_official_model_release",
+                applied_count=len(applied_deterministic),
+                remaining_duplicates=len(blocking),
+            )
+
+    if applied_deterministic and not blocking:
+        report = RepairReport(
+            date=date,
+            run_id=run_id,
+            attempted=True,
+            succeeded=True,
+            reason=(
+                "protected official model release and merged duplicate access "
+                "story as related link"
+            ),
+            actions=applied_deterministic,
+            pre_duplicate_count=len(_blocking_dups(sem_report)),
+            draft_version="v2",
+        )
+        tracer.log("repair_succeeded", applied_count=len(applied_deterministic))
+        return draft, report
 
     items_json = json.dumps(_item_list(draft), ensure_ascii=False, indent=2)
     dups_json = json.dumps(
@@ -388,7 +639,6 @@ def repair_draft(
         tracer.log("repair_failed", reason=report.reason)
         return draft, report
 
-    replacement_records = {r.source_url: r for r in curated_records}
     repaired, applied = apply_repair_actions(
         draft, actions, allowed_urls, replacement_records
     )
@@ -400,7 +650,7 @@ def repair_draft(
             attempted=True,
             succeeded=False,
             reason="all proposed replacement URLs were outside the curated artifact (fabrication rejected)",
-            actions=actions,
+            actions=[*applied_deterministic, *actions],
             pre_duplicate_count=len(blocking),
         )
         tracer.log("repair_failed", reason=report.reason)
@@ -416,7 +666,7 @@ def repair_draft(
             attempted=True,
             succeeded=False,
             reason=f"repaired draft failed schema validation: {e}",
-            actions=applied,
+            actions=[*applied_deterministic, *applied],
             pre_duplicate_count=len(blocking),
         )
         tracer.log("repair_failed", reason=report.reason)
@@ -427,10 +677,10 @@ def repair_draft(
         run_id=run_id,
         attempted=True,
         succeeded=True,
-        reason=f"repaired {len(applied)} item(s)",
-        actions=applied,
-        pre_duplicate_count=len(blocking),
+        reason=f"repaired {len(applied_deterministic) + len(applied)} item(s)",
+        actions=[*applied_deterministic, *applied],
+        pre_duplicate_count=len(_blocking_dups(sem_report)),
         draft_version="v2",
     )
-    tracer.log("repair_succeeded", applied_count=len(applied))
+    tracer.log("repair_succeeded", applied_count=len(applied_deterministic) + len(applied))
     return repaired, report
