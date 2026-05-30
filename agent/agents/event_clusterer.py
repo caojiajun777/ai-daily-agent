@@ -156,6 +156,10 @@ def cluster_items(items: List[RawItem]) -> List[EventCluster]:
         if idx is not None:
             # Merge into existing cluster.
             c = clusters[idx]
+            # Snapshot best rank BEFORE adding this item, so the comparison
+            # below can detect when the incoming item outranks every existing
+            # source in the cluster.
+            best_rank_before = _best_source_rank(c)
             if it.url not in c.source_urls:
                 c.source_urls.append(it.url)
             if it.source_id not in c.source_names:
@@ -167,8 +171,21 @@ def cluster_items(items: List[RawItem]) -> List[EventCluster]:
                 c.latest_seen_at = it.published_at
             if it.published_at < (c.first_seen_at or "z"):
                 c.first_seen_at = it.published_at
-            # Primary URL: prefer official sources.
-            if _source_rank(it.source_id, it.source_type) > _best_source_rank(c):
+            # Primary URL: prefer official sources.  When ranks tie, break
+            # on source_tier and evidence_type so an official lab release
+            # always beats a platform changelog for the same event.
+            new_rank = _source_rank(it.source_id, it.source_type)
+            if new_rank > best_rank_before or (
+                new_rank == best_rank_before
+                and _source_tier_rank(getattr(it, "source_tier", ""))
+                > _source_tier_rank(c.primary_source_tier)
+            ) or (
+                new_rank == best_rank_before
+                and _source_tier_rank(getattr(it, "source_tier", ""))
+                == _source_tier_rank(c.primary_source_tier)
+                and _evidence_type_rank(getattr(it, "evidence_type", ""))
+                > _evidence_type_rank(c.primary_evidence_type)
+            ):
                 c.primary_url = it.url
                 c.canonical_title = it.title
                 c.summary = it.summary[:500]
@@ -266,21 +283,78 @@ def _canonical_url(url: str) -> str:
 
 
 def _source_rank(source_id: str, source_type: str) -> int:
-    """Higher = more authoritative. Official blogs/docs/releases > media > KOL > unknown."""
-    s = (source_id + source_type).lower()
-    if any(k in s for k in ("official", "openai", "anthropic", "deepmind",
-                              "google", "github", "arxiv", "huggingface",
-                              "release", "docs", "blog")):
+    """Higher = more authoritative.
+
+    Tier 0 (14) — official lab primary sources (Anthropic, OpenAI, DeepMind, …).
+    Tier 1 (10) — platform releases, changelogs, docs, official blogs.
+    Tier 2  (8) — established media / press.
+    Tier 3  (4) — X / Twitter / KOL.
+    Fallback (2) — unknown.
+    """
+    sid = source_id.lower()
+    s = sid + source_type.lower()
+
+    # Tier 0: official lab primary sources beat everything else.
+    _LAB_SOURCES = (
+        "anthropic", "openai", "deepmind", "google_ai", "google_deepmind",
+        "google_research", "microsoft_ai", "nvidia_technical", "meta_ai",
+        "mistral", "deepseek_pricing", "deepseek_github",
+    )
+    if any(lab in sid for lab in _LAB_SOURCES):
+        return 14
+
+    # Tier 1: platform releases, changelogs, docs, official blogs.
+    if any(k in s for k in ("github", "arxiv", "huggingface", "release",
+                              "docs", "blog", "changelog", "official")):
         return 10
-    if "media" in s or "news" in s or "press" in s:
-        return 6
+
+    # Tier 2: established media / press.
+    if any(k in s for k in ("media", "news", "press", "bloomberg", "reuters",
+                              "techcrunch", "wired", "venturebeat", "wsj",
+                              "the_decoder", "ft_", "cnbc", "ithome")):
+        return 8
+
+    # Tier 3: X / Twitter / KOL.
     if any(k in s for k in ("x_", "twitter", "kol")):
         return 4
+
     return 2
 
 
 def _best_source_rank(cluster: EventCluster) -> int:
     return max((_source_rank(n, t) for n, t in zip(cluster.source_names, cluster.source_types)), default=0)
+
+
+def _source_tier_rank(source_tier: str) -> int:
+    """Numerical rank for source_tier strings (higher = better)."""
+    if not source_tier:
+        return 0
+    t = source_tier.lower()
+    if "tier_0" in t:
+        return 5
+    if "tier_1" in t:
+        return 4
+    if "tier_2" in t:
+        return 3
+    if "tier_3" in t:
+        return 2
+    return 1
+
+
+def _evidence_type_rank(evidence_type: str) -> int:
+    """Numerical rank for evidence_type strings (higher = better)."""
+    if not evidence_type:
+        return 0
+    e = evidence_type.lower()
+    if e in ("official_release", "official_docs", "pricing_page"):
+        return 5
+    if e in ("paper", "arxiv_paper"):
+        return 4
+    if e in ("insider_report", "product_changelog"):
+        return 3
+    if e == "media_report":
+        return 2
+    return 1
 
 
 def _gen_event_id(title: str, url: str) -> str:
