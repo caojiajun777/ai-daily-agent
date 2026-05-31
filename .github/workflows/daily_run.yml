@@ -1,9 +1,9 @@
 name: Agent — Daily Run & Publish
 
-# Runs every day at 10:17 Beijing time (UTC 02:17), then waits until
-# 12:00 Beijing time before publishing. This gives the LLM pipeline time
-# to collect, curate, repair, and pass gates while keeping the public
-# issue/email release at noon.
+# Automated daily publishing is paused while the project is under review.
+# This workflow can still be launched manually. Manual dispatch defaults
+# to dry-run so it previews without creating the GitHub issue or sending
+# email unless explicitly switched to confirmed publishing.
 #
 # Token policy: PUBLISH_TOKEN must be the repo owner's PAT.
 # Issues created by github-actions[bot] lack proper authorship for audit
@@ -19,8 +19,6 @@ name: Agent — Daily Run & Publish
 #   SMTP_PASSWORD          — QQ邮箱 SMTP 授权码 (NOT QQ password)
 
 on:
-  schedule:
-    - cron: "17 2 * * *"  # 10:17 CST = 02:17 UTC; avoid top-of-hour schedule drops
   workflow_dispatch:
     inputs:
       date:
@@ -30,7 +28,7 @@ on:
       dry_run:
         description: "Preview only — do not create the GitHub issue."
         required: false
-        default: "false"
+        default: "true"
         type: choice
         options:
           - "false"
